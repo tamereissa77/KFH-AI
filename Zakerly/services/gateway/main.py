@@ -48,8 +48,8 @@ async def lifespan(app: FastAPI):
     redis_manager.disconnect()
 
 app = FastAPI(
-    title="Zakerly API Gateway",
-    description="API Gateway for Zakerly microservices platform",
+    title="KFH Knowledge Assistant API Gateway",
+    description="API Gateway for the KFH Knowledge Assistant services",
     version="1.0.0",
     lifespan=lifespan
 )

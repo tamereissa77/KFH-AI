@@ -227,11 +227,11 @@ export class PresentationsService {
 export class Utils {
   static generateUserId(): string {
     // Generate a proper UUID for database compatibility
-    let userId = localStorage.getItem('zakerly_user_id');
+    let userId = localStorage.getItem('kfh_user_id');
     
     // Check if existing userId is in old format and clear it
     if (userId && (userId.startsWith('user_') || userId.length < 32)) {
-      localStorage.removeItem('zakerly_user_id');
+      localStorage.removeItem('kfh_user_id');
       userId = null;
     }
     
@@ -242,7 +242,7 @@ export class Utils {
         const v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
       });
-      localStorage.setItem('zakerly_user_id', userId);
+      localStorage.setItem('kfh_user_id', userId);
     }
     return userId;
   }

@@ -92,7 +92,7 @@ export default function SignIn() {
             />
             <span className="h-8 w-px bg-border" aria-hidden="true" />
             <h1 className="text-2xl font-bold text-accent dark:text-foreground">
-              Zakerly
+              Knowledge Assistant
             </h1>
           </div>
           <p className="text-muted-foreground">
@@ -201,7 +201,7 @@ export default function SignIn() {
                   to="/signup" 
                   className="font-medium text-primary hover:underline"
                 >
-                  Sign up for free
+                  Create an account
                 </Link>
               </p>
             </div>

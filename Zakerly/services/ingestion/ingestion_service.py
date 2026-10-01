@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import uuid
 import re
+import unicodedata
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
@@ -245,6 +246,8 @@ Respond with ONLY the JSON object, no additional text."""),
     def _clean_text_for_database(self, text: str) -> str:
         """Clean text to remove characters that cause database encoding issues"""
         # Remove null bytes and other control characters that cause UTF-8 issues
+        # NFKC folds Arabic presentation forms (common in PDF text layers) and ligatures into normal letters
+        text = unicodedata.normalize('NFKC', text)
         text = text.replace('\x00', '')  # Remove null bytes
         text = text.replace('\ufffd', '')  # Remove replacement characters
         

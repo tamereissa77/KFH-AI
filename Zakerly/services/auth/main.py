@@ -85,8 +85,8 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down Auth Service...")
 
 app = FastAPI(
-    title="Zakerly Auth Service",
-    description="Authentication service for Zakerly platform",
+    title="KFH Knowledge Assistant Auth Service",
+    description="Authentication service for the KFH Knowledge Assistant",
     version="1.0.0",
     lifespan=lifespan
 )

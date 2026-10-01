@@ -29,9 +29,9 @@ export function Header() {
               alt="KFH Egypt"
               className="h-12 w-auto"
             />
-            <span className="h-8 w-px bg-border" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-accent dark:text-foreground">
-            Zakerly
+            <span className="hidden sm:block h-8 w-px bg-border" aria-hidden="true" />
+            <h1 className="hidden sm:block text-xl font-bold text-accent dark:text-foreground">
+            Knowledge Assistant
           </h1>
         </div>
 

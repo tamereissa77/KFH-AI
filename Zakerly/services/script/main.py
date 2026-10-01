@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
     # Memory manager doesn't need explicit cleanup
 
 app = FastAPI(
-    title="Zakerly Script Service",
-    description="Intelligent lecture and script generation service for Zakerly platform",
+    title="KFH Knowledge Assistant Script Service",
+    description="Intelligent lecture and script generation service for the KFH Knowledge Assistant",
     version="1.0.0",
     lifespan=lifespan
 )
