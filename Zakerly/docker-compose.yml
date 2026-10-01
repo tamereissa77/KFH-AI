@@ -1,0 +1,230 @@
+
+
+services:
+  # PostgreSQL with pgvector extension
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: zakerly_postgres
+    environment:
+      POSTGRES_DB: zakerly_db
+      POSTGRES_USER: zakerly_user
+      POSTGRES_PASSWORD: zakerly_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - zakerly_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zakerly_user -d zakerly_db"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: zakerly_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@zakerly.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    ports:
+      - "8081:80"
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json
+      - ./pgadmin/pgpass:/pgadmin4/pgpass
+    depends_on:
+      - postgres
+    networks:
+      - zakerly_network
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: zakerly_redis
+    ports:
+      - "6380:6379"
+    networks:
+      - zakerly_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Document Ingestion Service
+  ingestion-service:
+    build:
+      context: .
+      dockerfile: ./services/ingestion/Dockerfile
+    container_name: zakerly_ingestion
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8008:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - zakerly_network
+
+  # Chat Service
+  chat-service:
+    build:
+      context: .
+      dockerfile: ./services/chat/Dockerfile
+    container_name: zakerly_chat
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8009:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zakerly_network
+
+  # Exam Service
+  exam-service:
+    build:
+      context: .
+      dockerfile: ./services/exam/Dockerfile
+    container_name: zakerly_exam
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8010:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zakerly_network
+
+  # Script Service
+  script-service:
+    build:
+      context: .
+      dockerfile: ./services/script/Dockerfile
+    container_name: zakerly_script
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8011:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zakerly_network
+
+  # Presentation Service
+  presentation-service:
+    build:
+      context: .
+      dockerfile: ./services/presentation/Dockerfile
+    container_name: zakerly_presentation
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8012:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - zakerly_network
+
+  # Authentication Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: ./services/auth/Dockerfile
+    container_name: zakerly_auth
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://zakerly_user:zakerly_password@postgres:5432/zakerly_db
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+    ports:
+      - "8013:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zakerly_network
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: ./services/gateway/Dockerfile
+    container_name: zakerly_gateway
+    environment:
+      - INGESTION_SERVICE_URL=http://ingestion-service:8000
+      - CHAT_SERVICE_URL=http://chat-service:8000
+      - AUTH_SERVICE_URL=http://auth-service:8000
+      - EXAM_SERVICE_URL=http://exam-service:8003
+      - SCRIPT_SERVICE_URL=http://script-service:8004
+      - PRESENTATION_SERVICE_URL=http://presentation-service:8005
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8007:8000"
+    depends_on:
+      - ingestion-service
+      - chat-service
+      - exam-service
+      - script-service
+      - presentation-service
+      - auth-service
+    networks:
+      - zakerly_network
+
+  # Frontend UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: zakerly_frontend
+    environment:
+      - VITE_API_URL=http://172.24.111.111:8007
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api-gateway
+    networks:
+      - zakerly_network
+
+volumes:
+  postgres_data:
+
+networks:
+  zakerly_network:
+    driver: bridge

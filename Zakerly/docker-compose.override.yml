@@ -1,0 +1,50 @@
+# Local deployment overrides for this host (192.168.8.4, aarch64 + NVIDIA GB10).
+# - Runs Ollama locally for embeddings (the 172.24.88.88 instance in .env is unreachable here).
+# - Bakes this host's gateway URL into the frontend build.
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: zakerly_ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - zakerly_network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  ingestion-service:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
+  chat-service:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+  exam-service:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+  script-service:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+  presentation-service:
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+
+  frontend:
+    build:
+      args:
+        VITE_API_URL: http://192.168.8.4:8007
+
+volumes:
+  ollama_data:
