@@ -1,3 +1,24 @@
+# KFH Knowledge Assistant
+
+Internal tool for KFH employees: ask questions about bank documents (English or Arabic) and get answers
+cited to the document and page, plus policy quizzes. Runs on-premises: a local vLLM (Gemma 4) and
+bge-m3 embeddings via Ollama.
+
+## Quick start
+
+```bash
+cp .env.example .env        # then set DEMO_OWNER (and JWT_SECRET)
+make up                     # starts the Gemma LLM if needed, then the app; prints the URLs
+make status                 # containers, LLM, service health
+make demo-load              # optional: load the demo knowledge bases from demo/ (sign up in the app first)
+make demo-test              # ask the demo questions and check every answer cites sources
+make                        # all targets
+```
+
+`docker-compose.override.yml` holds the deployment settings for the GB10 (LLM endpoint, embedding model).
+
+---
+
 # Zakerly - Enterprise AI-Powered Document Intelligence Platform
 
 Zakerly is a professional, enterprise-grade microservices platform that transforms documents into intelligent, interactive knowledge bases using advanced AI technology. Built with Python LangChain, it provides document ingestion, intelligent chat, question generation, and lecture creation capabilities.

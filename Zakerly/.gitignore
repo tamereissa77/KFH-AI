@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 uploads/
 node_modules/
+demo/documents/
+backups/
