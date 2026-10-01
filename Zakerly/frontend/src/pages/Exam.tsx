@@ -54,7 +54,7 @@ export default function Exam() {
   // Generate questions on component mount
   useEffect(() => {
     if (!bookTitle) {
-      setError('No book selected for exam');
+      setError('No document selected for quiz');
       setIsLoadingQuestions(false);
       return;
     }
@@ -80,7 +80,7 @@ export default function Exam() {
 
       const request: QuestionGenerationRequest = {
         book_title: decodeURIComponent(bookTitle),
-        user_message: `Generate ${questionCount} exam questions with various difficulty levels and types`,
+        user_message: `Generate ${questionCount} quiz questions with various difficulty levels and types`,
         count: questionCount,
         difficulty: difficulty,
         question_types: questionTypes
@@ -101,7 +101,7 @@ export default function Exam() {
 
       const exam: ExamData = {
         id: `exam_${Date.now()}`,
-        title: `${decodeURIComponent(bookTitle)} Exam`,
+        title: `${decodeURIComponent(bookTitle)} Quiz`,
         book: decodeURIComponent(bookTitle),
         difficulty: difficulty.join(', '),
         timeLimit: timeLimit,
@@ -111,7 +111,7 @@ export default function Exam() {
       setExamData(exam);
     } catch (err) {
       console.error('Error generating questions:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate exam questions');
+      setError(err instanceof Error ? err.message : 'Failed to generate quiz questions');
     } finally {
       setIsLoadingQuestions(false);
     }
@@ -211,7 +211,7 @@ export default function Exam() {
             <Card className="text-center">
               <CardContent className="pt-6">
                 <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Generating Your Exam</h2>
+                <h2 className="text-xl font-semibold mb-2">Generating Your Quiz</h2>
                 <p className="text-muted-foreground">Please wait while we create your personalized questions...</p>
               </CardContent>
             </Card>
@@ -230,11 +230,11 @@ export default function Exam() {
           <div className="max-w-4xl mx-auto">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error || 'Failed to load exam data'}</AlertDescription>
+              <AlertDescription>{error || 'Failed to load quiz data'}</AlertDescription>
             </Alert>
             <div className="text-center mt-6">
               <Button onClick={() => navigate('/exam-setup')}>
-                Return to Exam Setup
+                Return to Quiz Setup
               </Button>
             </div>
           </div>
@@ -258,7 +258,7 @@ export default function Exam() {
                 <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                   <CheckCircle className="w-10 h-10 text-white" />
                 </div>
-                <CardTitle className="text-2xl">Exam Completed!</CardTitle>
+                <CardTitle className="text-2xl">Quiz Completed!</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -424,7 +424,7 @@ export default function Exam() {
                   <div className="flex gap-2">
                     {currentQuestionIndex === examData.questions.length - 1 ? (
                       <Button onClick={handleSubmitExam} className="bg-green-600 hover:bg-green-700">
-                        Submit Exam
+                        Submit Quiz
                       </Button>
                     ) : (
                       <Button onClick={handleNext}>

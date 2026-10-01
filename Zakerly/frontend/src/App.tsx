@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
@@ -17,7 +17,6 @@ import Scripts from './pages/Scripts_New';
 import ScriptSetup from './pages/Scripts';
 import Presentations from './pages/Presentations';
 import PresentationView from './pages/PresentationView';
-import Features from "./pages/Features";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
@@ -36,7 +35,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/signin" element={<SignIn />} />
             <Route path="/signup" element={<SignUp />} />
-            <Route path="/features" element={<Features />} />
+            <Route path="/features" element={<Navigate to="/" replace />} />
             
             {/* Protected routes - require authentication */}
             <Route path="/home" element={

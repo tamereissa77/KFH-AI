@@ -2,100 +2,69 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './card';
 import { Button } from './button';
-import { 
-  MessageSquare, 
-  GraduationCap, 
-  Presentation, 
-  FileText,
-  ArrowRight,
-  Sparkles
-} from 'lucide-react';
+import { MessageSquare, FolderOpen, ClipboardCheck, ArrowRight } from 'lucide-react';
 
 const features = [
   {
     icon: MessageSquare,
-    title: 'AI Chat with Books',
-    description: 'Ask questions about any uploaded book and get instant, accurate answers with citations.',
-    benefits: ['Natural language queries', 'Source citations', 'Context-aware responses'],
-    gradient: 'from-primary to-primary-light'
+    title: 'Ask the documents',
+    description: 'Ask a question in Arabic or English. Narrow it to one document or a specific point or topic.',
+    benefits: ['Answers only from KFH documents', 'Document and page cited', 'Says so when a topic is not covered'],
+    to: '/chat',
+    action: 'Ask a question',
   },
   {
-    icon: GraduationCap,
-    title: 'Smart Exam Generator',
-    description: 'Create customized exams with multiple question types and difficulty levels.',
-    benefits: ['Multiple choice & essays', 'Adjustable difficulty', 'Instant generation'],
-    gradient: 'from-accent to-accent-light'
+    icon: FolderOpen,
+    title: 'Knowledge bases',
+    description: 'Documents are grouped into knowledge bases such as Retail Banking, Compliance or HR policies.',
+    benefits: ['PDF, Word and text files', 'One place per department or topic', 'Searchable by meaning, not just keywords'],
+    to: '/books',
+    action: 'Browse knowledge bases',
   },
   {
-    icon: Presentation,
-    title: 'Interactive Rehearsal',
-    description: 'Practice with generated exams in an engaging, feedback-rich environment.',
-    benefits: ['Real-time feedback', 'Progress tracking', 'Detailed explanations'],
-    gradient: 'from-primary-dark to-primary'
+    icon: ClipboardCheck,
+    title: 'Policy quizzes',
+    description: 'Generate short quizzes from any document to check that staff know the latest policies and procedures.',
+    benefits: ['Built from the document itself', 'Multiple choice and true/false', 'Useful for onboarding and compliance'],
+    to: '/exams',
+    action: 'Create a quiz',
   },
-  {
-    icon: FileText,
-    title: 'Lecture Scripts',
-    description: 'Generate comprehensive lecture scripts and presentation materials.',
-    benefits: ['Structured content', 'Export options', 'Customizable depth'],
-    gradient: 'from-orange-500 to-red-500'
-  }
 ];
 
 export function FeaturesSection() {
   const navigate = useNavigate();
   return (
-    <section className="py-20">
+    <section className="py-16 bg-muted/30">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 text-accent text-sm font-medium mb-4">
-            <Sparkles className="w-4 h-4" />
-            Powerful Features
-          </div>
-          <h2 className="text-4xl font-bold mb-4">
-            Everything You Need to Excel
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Zakerly combines cutting-edge AI with intuitive design to create the ultimate learning companion
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold mb-3">What you can do</h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            One place to find what KFH documents say, without searching through files.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {features.map((feature, index) => (
-            <Card 
-              key={index}
-              className="group interactive-card border-0 shadow-soft overflow-hidden relative"
-            >
-              {/* Gradient background */}
-              <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`} />
-              
-              <CardHeader className="relative">
-                <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-4`}>
-                  <feature.icon className="w-6 h-6 text-white" />
+        <div className="grid md:grid-cols-3 gap-6">
+          {features.map(({ icon: Icon, title, description, benefits, to, action }) => (
+            <Card key={title} className="interactive-card flex flex-col" onClick={() => navigate(to)}>
+              <CardHeader>
+                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-3">
+                  <Icon className="w-6 h-6 text-primary" />
                 </div>
-                <CardTitle className="text-xl mb-2">{feature.title}</CardTitle>
-                <CardDescription className="text-base">
-                  {feature.description}
-                </CardDescription>
+                <CardTitle className="text-xl">{title}</CardTitle>
+                <CardDescription className="text-base">{description}</CardDescription>
               </CardHeader>
-              
-              <CardContent className="relative">
-                <ul className="space-y-2 mb-6">
-                  {feature.benefits.map((benefit, idx) => (
-                    <li key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+              <CardContent className="flex-1 flex flex-col justify-between gap-6">
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  {benefits.map((benefit) => (
+                    <li key={benefit} className="flex items-start gap-2">
+                      <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
                       {benefit}
                     </li>
                   ))}
                 </ul>
-                
-                <Button 
-                  variant="ghost" 
-                  className="group/btn text-primary hover:text-primary hover:bg-primary/10 p-0"
-                  onClick={() => navigate('/features')}
-                >
-                  Explore Feature
-                  <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+                <Button variant="outline" className="w-full justify-between">
+                  {action}
+                  <ArrowRight className="w-4 h-4" />
                 </Button>
               </CardContent>
             </Card>

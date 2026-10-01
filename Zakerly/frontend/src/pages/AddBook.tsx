@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTitle } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/ui/header';
 import { Button } from '@/components/ui/button';
@@ -208,19 +209,19 @@ export default function AddBook() {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <CheckCircle className="w-10 h-10 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold mb-4">Book Added Successfully!</h2>
+              <h2 className="text-2xl font-bold mb-4">Document Added</h2>
               <div className="bg-primary/5 rounded-lg p-6 mb-6">
                 <div className="flex items-center gap-4 justify-center">
                   <div className="w-12 h-16 bg-gradient-to-br from-primary to-secondary rounded shadow-sm flex items-center justify-center">
                     <BookOpen className="w-6 h-6 text-white" />
                   </div>
                   <div className="text-left">
-                    <h3 className="font-semibold text-lg">{uploadedBook.title}</h3>
+                    <h3 className="font-semibold text-lg">{formatTitle(uploadedBook.title)}</h3>
                     {uploadedBook.author && (
-                      <p className="text-muted-foreground">by {uploadedBook.author}</p>
+                      <p className="text-muted-foreground">Issued by {uploadedBook.author}</p>
                     )}
                     <p className="text-sm text-muted-foreground">
-                      Curriculum: {curriculums.find(c => c.id === uploadedBook.curriculum_id)?.name || 'Unknown'}
+                      Knowledge base: {curriculums.find(c => c.id === uploadedBook.curriculum_id)?.name || 'Unknown'}
                     </p>
                   </div>
                 </div>
@@ -230,11 +231,11 @@ export default function AddBook() {
               </p>
               <div className="flex gap-4 justify-center">
                 <Button onClick={() => navigate('/books')} className="bg-gradient-primary">
-                  View My Library
+                  View Knowledge Bases
                 </Button>
                 <Button 
                   variant="outline" 
-                  onClick={() => navigate(`/chat?book=${encodeURIComponent(uploadedBook.title)}`)}
+                  onClick={() => navigate(`/chat?document=${uploadedBook.id}`)}
                 >
                   Start Chatting
                 </Button>
@@ -261,12 +262,12 @@ export default function AddBook() {
               className="flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Library
+              Back to Knowledge Bases
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gradient-primary">Add New Book</h1>
+              <h1 className="text-3xl font-bold text-gradient-primary">Upload a Document</h1>
               <p className="text-muted-foreground">
-                Upload a book and let AI extract all the information automatically
+                Add a policy, procedure, circular or product document so staff can ask questions about it
               </p>
             </div>
           </div>
@@ -298,7 +299,7 @@ export default function AddBook() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <GraduationCap className="w-5 h-5 text-primary" />
-                  Select Curriculum
+                  Select Knowledge Base
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -310,12 +311,12 @@ export default function AddBook() {
                 )}
 
                 <div className="space-y-4">
-                  <Label htmlFor="curriculum-select">Choose a curriculum for this book:</Label>
+                  <Label htmlFor="curriculum-select">Which knowledge base does this document belong to?</Label>
                   
                   {isLoadingCurriculums ? (
                     <div className="flex items-center gap-2 p-4 bg-muted/50 rounded-lg">
                       <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <span className="text-sm text-muted-foreground">Loading curriculums...</span>
+                      <span className="text-sm text-muted-foreground">Loading knowledge bases...</span>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -324,7 +325,7 @@ export default function AddBook() {
                         onValueChange={(value) => setSelectedCurriculumId(parseInt(value))}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a curriculum" />
+                          <SelectValue placeholder="Select a knowledge base" />
                         </SelectTrigger>
                         <SelectContent>
                           {curriculums.map((curriculum) => (
@@ -356,11 +357,11 @@ export default function AddBook() {
                           className="w-full flex items-center gap-2"
                         >
                           <Plus className="w-4 h-4" />
-                          Create New Curriculum
+                          Create New Knowledge Base
                         </Button>
                       ) : (
                         <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
-                          <h4 className="font-medium text-sm">Create New Curriculum</h4>
+                          <h4 className="font-medium text-sm">Create New Knowledge Base</h4>
                           <div className="space-y-3">
                             <div>
                               <Label htmlFor="curriculum-name">Name *</Label>
@@ -378,7 +379,7 @@ export default function AddBook() {
                                 id="curriculum-description"
                                 value={newCurriculumDescription}
                                 onChange={(e) => setNewCurriculumDescription(e.target.value)}
-                                placeholder="Optional description of the curriculum"
+                                placeholder="e.g. Retail banking policies and procedures"
                                 className="mt-1"
                                 rows={2}
                               />
@@ -390,7 +391,7 @@ export default function AddBook() {
                                 size="sm"
                                 className="bg-gradient-primary"
                               >
-                                Create Curriculum
+                                Create Knowledge Base
                               </Button>
                               <Button
                                 type="button"
@@ -420,7 +421,7 @@ export default function AddBook() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Upload className="w-5 h-5 text-primary" />
-                  Upload Your Book
+                  Upload Your Document
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -445,10 +446,10 @@ export default function AddBook() {
                               <BookOpen className="w-5 h-5 text-white" />
                             </div>
                             <div>
-                              <p className="font-medium text-gray-900">{existingBook.title}</p>
+                              <p className="font-medium text-gray-900">{formatTitle(existingBook.title)}</p>
                               <p className="text-sm text-gray-600">
                                 {existingBook.author && existingBook.author !== 'Unknown' 
-                                  ? `by ${existingBook.author}` 
+                                  ? `Issued by ${existingBook.author}` 
                                   : 'File name: ' + existingBook.file_name}
                               </p>
                             </div>
@@ -460,12 +461,12 @@ export default function AddBook() {
                             onClick={() => navigate('/books')}
                             className="bg-orange-600 hover:bg-orange-700"
                           >
-                            View in Library
+                            View in Knowledge Bases
                           </Button>
                           <Button 
                             size="sm" 
                             variant="outline"
-                            onClick={() => navigate(`/chat?book=${encodeURIComponent(existingBook.title)}`)}
+                            onClick={() => navigate(`/chat?document=${existingBook.id}`)}
                           >
                             Start Chatting
                           </Button>
@@ -511,7 +512,7 @@ export default function AddBook() {
                       <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Upload className="w-10 h-10 text-primary" />
                       </div>
-                      <h3 className="text-xl font-semibold mb-3">Drop your book file here</h3>
+                      <h3 className="text-xl font-semibold mb-3">Drop your document here</h3>
                       <p className="text-muted-foreground mb-6">
                         or click to browse your files
                       </p>
@@ -527,11 +528,11 @@ export default function AddBook() {
                       <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Brain className="w-3 h-3" />
-                          <span>AI Metadata Extraction</span>
+                          <span>Title and details extracted automatically</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Sparkles className="w-3 h-3" />
-                          <span>Smart Categorization</span>
+                          <span>Page-level source citations</span>
                         </div>
                       </div>
                     </div>
@@ -547,13 +548,13 @@ export default function AddBook() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                      <span className="font-medium">Processing your book with AI...</span>
+                      <span className="font-medium">Processing your document...</span>
                     </div>
                     <Progress value={uploadProgress} className="h-3" />
                     <div className="text-sm text-muted-foreground text-center">
-                      {uploadProgress < 30 && "📄 Reading book content..."}
-                      {uploadProgress >= 30 && uploadProgress < 60 && "🧠 Extracting metadata with AI..."}
-                      {uploadProgress >= 60 && uploadProgress < 90 && "📚 Creating embeddings for smart search..."}
+                      {uploadProgress < 30 && "📄 Reading the document..."}
+                      {uploadProgress >= 30 && uploadProgress < 60 && "🧠 Extracting title and details..."}
+                      {uploadProgress >= 60 && uploadProgress < 90 && "🔎 Indexing for search..."}
                       {uploadProgress >= 90 && "✨ Finalizing..."}
                     </div>
                   </div>
@@ -585,7 +586,7 @@ export default function AddBook() {
                 ) : (
                   <>
                     <Save className="w-4 h-4 mr-2" />
-                    Add Book to Library
+                    Add Document
                   </>
                 )}
               </Button>

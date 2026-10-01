@@ -96,7 +96,7 @@ export default function SignIn() {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            Welcome back to your AI academic assistant
+            Sign in to the KFH internal knowledge assistant
           </p>
         </div>
 
@@ -212,7 +212,7 @@ export default function SignIn() {
         <div className="mt-8 text-center">
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <BookOpen className="w-4 h-4" />
-            <span>AI-powered learning • Exam generation • Lecture scripts</span>
+            <span>Ask documents • Cited answers • Policy quizzes</span>
           </div>
         </div>
       </div>

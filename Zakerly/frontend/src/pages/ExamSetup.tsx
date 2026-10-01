@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTitle } from '@/lib/utils';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Header } from '@/components/ui/header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -76,7 +77,7 @@ export default function ExamSetup() {
       setCurriculums(curriculumsData);
     } catch (err) {
       console.error('Error loading data:', err);
-      setError('Failed to load books and curriculums');
+      setError('Failed to load documents and knowledge bases');
     } finally {
       setIsLoadingBooks(false);
     }
@@ -132,12 +133,12 @@ export default function ExamSetup() {
   const handleGenerateExam = () => {
     // Validate required fields
     if (!examConfig.curriculumId) {
-      setError('Please select a curriculum');
+      setError('Please select a knowledge base');
       return;
     }
     
     if (examConfig.scopeType !== 'whole_curriculum' && !examConfig.bookTitle) {
-      setError('Please select a book');
+      setError('Please select a document');
       return;
     }
     
@@ -152,7 +153,7 @@ export default function ExamSetup() {
     }
 
     if (examConfig.scopeType === 'specific_topics' && !examConfig.specificTopics.trim()) {
-      setError('Please specify topics for the exam');
+      setError('Please specify topics for the quiz');
       return;
     }
 
@@ -162,7 +163,7 @@ export default function ExamSetup() {
     // Navigate to ExamView with parameters
     const params = new URLSearchParams({
       curriculumId: examConfig.curriculumId,
-      book: examConfig.bookTitle || 'Whole Curriculum',
+      book: examConfig.bookTitle || 'Whole Knowledge Base',
       questionCount: examConfig.questionCount.toString(),
       timeLimit: examConfig.timeLimit.toString(),
       difficulty: examConfig.difficulty.join(','),
@@ -185,9 +186,9 @@ export default function ExamSetup() {
           <div className="flex items-center gap-3">
             <GraduationCap className="text-primary" size={32} />
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Exam Setup</h1>
+              <h1 className="text-3xl font-bold text-gray-900">Quiz Setup</h1>
               <p className="text-gray-600">
-                Choose a curriculum and configure your exam settings
+                Choose a knowledge base and configure your quiz settings
               </p>
             </div>
           </div>
@@ -205,23 +206,23 @@ export default function ExamSetup() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <GraduationCap className="w-5 h-5" />
-              Step 1: Select Curriculum
+              Step 1: Select Knowledge Base
             </CardTitle>
             <CardDescription>
-              Choose the curriculum that contains the content for your exam
+              Choose the knowledge base that contains the content for your quiz
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label>Curriculum</Label>
+                <Label>Knowledge Base</Label>
                 <Select 
                   value={examConfig.curriculumId} 
                   onValueChange={handleCurriculumChange}
                   disabled={isLoadingBooks}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a curriculum" />
+                    <SelectValue placeholder="Select a knowledge base" />
                   </SelectTrigger>
                   <SelectContent>
                     {curriculums.map((curriculum) => (
@@ -243,7 +244,7 @@ export default function ExamSetup() {
                     <h4 className="font-semibold text-primary-dark">{selectedCurriculum.name}</h4>
                   </div>
                   <p className="text-primary-dark text-sm mb-2">
-                    {selectedCurriculum.description || 'Selected curriculum'}
+                    {selectedCurriculum.description || 'Selected knowledge base'}
                   </p>
                   <div className="flex items-center gap-4 text-sm text-primary">
                     <span className="flex items-center gap-1">
@@ -263,10 +264,10 @@ export default function ExamSetup() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                Step 2: Choose Exam Scope
+                Step 2: Choose Quiz Scope
               </CardTitle>
               <CardDescription>
-                Decide what content to include in your exam from the selected curriculum
+                Decide what content to include in your quiz from the selected knowledge base
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -282,7 +283,7 @@ export default function ExamSetup() {
                     <Label htmlFor="whole_curriculum" className="cursor-pointer flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <GraduationCap className="w-5 h-5 text-primary" />
-                        <div className="font-semibold text-lg">Whole Curriculum Exam</div>
+                        <div className="font-semibold text-lg">Whole Knowledge Base Quiz</div>
                       </div>
                       <div className="text-sm text-gray-600 mb-2">
                         Generate a comprehensive exam covering all {books.length} books in the curriculum
@@ -299,10 +300,10 @@ export default function ExamSetup() {
                     <Label htmlFor="whole_book" className="cursor-pointer flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <BookOpen className="w-5 h-5 text-green-600" />
-                        <div className="font-semibold text-lg">Single Book Exam</div>
+                        <div className="font-semibold text-lg">Single Document Quiz</div>
                       </div>
                       <div className="text-sm text-gray-600 mb-2">
-                        Generate exam focused on one specific book from the curriculum
+                        Generate quiz focused on one specific document from the knowledge base
                       </div>
                       <div className="text-xs text-green-600 font-medium">
                         ✓ Perfect for testing knowledge of specific topics or subject areas
@@ -319,7 +320,7 @@ export default function ExamSetup() {
                         <div className="font-semibold text-lg">Specific Topics</div>
                       </div>
                       <div className="text-sm text-gray-600 mb-2">
-                        Focus on particular topics, chapters, or concepts you specify
+                        Focus on particular topics, sections, or policies you specify
                       </div>
                       <div className="text-xs text-accent font-medium">
                         ✓ Ideal for targeted assessment of specific learning objectives
@@ -331,21 +332,21 @@ export default function ExamSetup() {
                 {/* Book Selection - Only show for single book and specific topics */}
                 {(examConfig.scopeType === 'whole_book' || examConfig.scopeType === 'specific_topics') && (
                   <div className="space-y-2 mt-4">
-                    <Label>Select Book</Label>
+                    <Label>Select Document</Label>
                     <Select 
                       value={examConfig.bookTitle} 
                       onValueChange={handleBookChange}
                       disabled={!examConfig.curriculumId || isLoadingBooks}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a book from the curriculum" />
+                        <SelectValue placeholder="Choose a document from the knowledge base" />
                       </SelectTrigger>
                       <SelectContent>
                         {books.map((book) => (
                           <SelectItem key={book.id} value={book.title}>
                             <div className="flex items-center gap-2">
                               <BookOpen className="w-4 h-4" />
-                              {book.title}
+                              {formatTitle(book.title)}
                             </div>
                           </SelectItem>
                         ))}
@@ -360,13 +361,13 @@ export default function ExamSetup() {
                     <Label htmlFor="topics">Specify Topics</Label>
                     <Textarea
                       id="topics"
-                      placeholder="Enter specific topics, chapters, or concepts you want to focus on..."
+                      placeholder="Enter specific topics, sections, or policies you want to focus on..."
                       value={examConfig.specificTopics}
                       onChange={(e) => setExamConfig(prev => ({ ...prev, specificTopics: e.target.value }))}
                       className="min-h-[100px]"
                     />
                     <p className="text-sm text-gray-500">
-                      List the topics, chapters, or concepts you want the exam to focus on
+                      List the topics, sections, or policies you want the quiz to focus on
                     </p>
                   </div>
                 )}
@@ -386,7 +387,7 @@ export default function ExamSetup() {
                   Step 3: Basic Settings
                 </CardTitle>
                 <CardDescription>
-                  Configure the fundamental parameters for your exam
+                  Configure the fundamental parameters for your quiz
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -486,15 +487,15 @@ export default function ExamSetup() {
               <div className="space-y-4">
                 {/* Exam Summary */}
                 <div className="p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-semibold mb-3">Exam Summary</h4>
+                  <h4 className="font-semibold mb-3">Quiz Summary</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="font-medium">Curriculum:</span> {selectedCurriculum?.name}
+                      <span className="font-medium">Knowledge Base:</span> {selectedCurriculum?.name}
                     </div>
                     <div>
                       <span className="font-medium">Scope:</span> {
-                        examConfig.scopeType === 'whole_curriculum' ? 'Whole Curriculum' :
-                        examConfig.scopeType === 'whole_book' ? `Book: ${examConfig.bookTitle}` :
+                        examConfig.scopeType === 'whole_curriculum' ? 'Whole Knowledge Base' :
+                        examConfig.scopeType === 'whole_book' ? `Document: ${formatTitle(examConfig.bookTitle)}` :
                         'Specific Topics'
                       }
                     </div>
@@ -534,7 +535,7 @@ export default function ExamSetup() {
                     ) : (
                       <>
                         <GraduationCap className="w-4 h-4 mr-2" />
-                        Generate Exam Preview
+                        Generate Quiz Preview
                       </>
                     )}
                   </Button>

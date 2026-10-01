@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Header } from '@/components/ui/header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Send, BookOpen, Download, Copy, ExternalLink, Loader2, AlertCircle, ArrowLeft, Plus, GraduationCap } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { BooksService, ChatService, SessionService, Utils, CurriculumService } from '@/lib/services';
-import type { Book as BookType, ChatMessage, ChatSession, ChatResponse, Curriculum, QuestionGenerationRequest } from '@/lib/types';
+import { Send, FolderOpen, FileText, Download, Copy, Loader2, AlertCircle, Plus, MessageSquare, Target } from 'lucide-react';
+import { cn, formatTitle } from '@/lib/utils';
+import { BooksService, ChatService, SessionService, CurriculumService } from '@/lib/services';
+import type { Book as BookType, ChatSession, ChatSource, Curriculum } from '@/lib/types';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
@@ -19,56 +22,68 @@ interface Message {
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  metadata?: any;
+  scope?: string;
+  sources?: ChatSource[];
+}
+
+const ALL_DOCUMENTS = 'all';
+
+function sourceLabel(source: ChatSource) {
+  return source.page ? `${source.document}, p. ${source.page}` : source.document;
 }
 
 export default function Chat() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const curriculumParam = searchParams.get('curriculum');
-  const { user } = useAuth(); // ✅ Get authenticated user from AuthContext
-  
+  const documentParam = searchParams.get('document');
+  const { user } = useAuth();
+
   const [curriculums, setCurriculums] = useState<Curriculum[]>([]);
   const [selectedCurriculum, setSelectedCurriculum] = useState<string>('');
-  const [books, setBooks] = useState<BookType[]>([]);
   const [allBooks, setAllBooks] = useState<BookType[]>([]);
+  const [selectedDocument, setSelectedDocument] = useState<string>(ALL_DOCUMENTS);
+  const [topic, setTopic] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState('');
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const userId = user?.sub || ''; // ✅ Use authenticated user's ID from JWT token
+  const userId = user?.sub || '';
 
   const selectedCurriculumData = curriculums.find(curr => curr.id.toString() === selectedCurriculum);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  const documents = allBooks.filter(book => book.curriculum_id.toString() === selectedCurriculum);
+  const selectedDocumentData = documents.find(book => book.id.toString() === selectedDocument);
 
   useEffect(() => {
-    scrollToBottom();
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load books and categories on component mount
   useEffect(() => {
     loadData();
   }, []);
 
-  // Set selected curriculum from URL param
+  // Preselect a knowledge base from the URL (?curriculum=<name>)
   useEffect(() => {
-    if (curriculumParam && allBooks.length > 0 && curriculums.length > 0) {
-      const decodedCurriculum = decodeURIComponent(curriculumParam);
-      const curriculum = curriculums.find(c => c.name === decodedCurriculum);
-      if (curriculum) {
-        setSelectedCurriculum(curriculum.id.toString());
-        handleCurriculumChange(curriculum.id.toString());
+    if (curriculumParam && curriculums.length > 0) {
+      const curriculum = curriculums.find(c => c.name === decodeURIComponent(curriculumParam));
+      if (curriculum) handleCurriculumChange(curriculum.id.toString());
+    }
+  }, [curriculumParam, curriculums]);
+
+  // Preselect a document from the URL (?document=<id>), e.g. from a document card
+  useEffect(() => {
+    if (documentParam && allBooks.length > 0) {
+      const doc = allBooks.find(b => b.id.toString() === documentParam);
+      if (doc) {
+        handleCurriculumChange(doc.curriculum_id.toString());
+        setSelectedDocument(doc.id.toString());
       }
     }
-  }, [curriculumParam, allBooks, curriculums]);
+  }, [documentParam, allBooks]);
 
   const loadData = async () => {
     try {
@@ -78,11 +93,10 @@ export default function Chat() {
         CurriculumService.getCurriculums()
       ]);
       setAllBooks(booksData);
-      setBooks(booksData);
       setCurriculums(curriculumsData);
     } catch (err) {
       console.error('Error loading data:', err);
-      setError('Failed to load books and curriculums');
+      setError('Failed to load knowledge bases and documents');
     } finally {
       setIsLoadingData(false);
     }
@@ -90,54 +104,27 @@ export default function Chat() {
 
   const handleCurriculumChange = (curriculumId: string) => {
     setSelectedCurriculum(curriculumId);
+    setSelectedDocument(ALL_DOCUMENTS);
     setMessages([]);
     setCurrentSession(null);
-    
-    if (curriculumId === 'all') {
-      setBooks(allBooks);
-    } else {
-      const filteredBooks = allBooks.filter(book => book.curriculum_id === parseInt(curriculumId));
-      setBooks(filteredBooks);
-    }
   };
 
-  const loadChatSession = async (curriculumName: string) => {
-    try {
-      // Try to get existing sessions for this user and curriculum
-      const sessions = await SessionService.getUserSessions(userId);
-      const existingSession = sessions.find(session => 
-        session.session_name?.includes(curriculumName)
-      );
-
-      if (existingSession) {
-        setCurrentSession(existingSession);
-        const history = await SessionService.getChatHistory(existingSession.id);
-        const formattedMessages: Message[] = history.history.map(msg => ({
-          id: msg.id.toString(),
-          type: msg.message_type,
-          content: msg.content,
-          timestamp: new Date(msg.created_at),
-          metadata: msg.metadata
-        }));
-        setMessages(formattedMessages);
-      }
-    } catch (err) {
-      console.error('Error loading chat session:', err);
-      // Continue without existing session
-    }
+  const describeScope = () => {
+    const parts = [selectedDocumentData ? formatTitle(selectedDocumentData.title) : 'All documents'];
+    if (topic.trim()) parts.push(`topic: ${topic.trim()}`);
+    return parts.join(' · ');
   };
 
   const handleSendMessage = async () => {
-    if (!currentMessage.trim() || !selectedCurriculum || isLoading) return;
-
+    if (!currentMessage.trim() || !selectedCurriculumData || isLoading) return;
     const curriculum = selectedCurriculumData;
-    if (!curriculum) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
       content: currentMessage,
       timestamp: new Date(),
+      scope: describeScope(),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -147,62 +134,38 @@ export default function Chat() {
     setError('');
 
     try {
-      // Create session if needed
       let sessionId = currentSession?.id || '';
       if (!currentSession) {
-        // Create session for curriculum-based chat
-        const newSession = await SessionService.createSession(
-          userId,
-          curriculum.name,
-          `Chat with ${curriculum.name} Curriculum`,
-          true // isCurriculum = true
-        );
+        const newSession = await SessionService.createSession(userId, curriculum.name, `Ask ${curriculum.name}`, true);
         setCurrentSession(newSession);
         sessionId = newSession.id;
       }
 
-      // Send curriculum-based chat request (book_title required by current API)
-      const chatRequest = {
+      const response = await ChatService.sendMessage({
         curriculum: curriculum.name,
-        book_title: books.length > 0 ? books[0].title : 'Curriculum Books',
         session_id: sessionId,
         user_message: messageToSend,
-        intent: 'answer_question'
-      };
+        intent: 'answer_question',
+        book_id: selectedDocumentData ? selectedDocumentData.id : null,
+        topic: topic.trim() || null,
+      });
 
-      const response = await ChatService.sendMessage(chatRequest);
-
-      const aiMessage: Message = {
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
         content: response.response,
         timestamp: new Date(),
-        metadata: response.metadata
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
-
+        sources: response.metadata?.sources || [],
+      }]);
     } catch (err) {
       console.error('Error sending message:', err);
-      let errorMessage = 'Failed to send message';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        // Fix: Properly stringify error objects
-        errorMessage = JSON.stringify(err);
-      }
-      
-      setError(errorMessage);
-      
-      // Add error message to chat
-      const errorChatMessage: Message = {
+      setError(err instanceof Error ? err.message : 'Failed to send message');
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         type: 'assistant',
-        content: 'I apologize, but I encountered an error processing your message. Please try again.',
+        content: 'Sorry, something went wrong while processing your question. Please try again.',
         timestamp: new Date(),
-      };
-      setMessages(prev => [...prev, errorChatMessage]);
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -215,60 +178,37 @@ export default function Chat() {
     }
   };
 
+  const transcript = () => messages.map(msg => {
+    const who = msg.type === 'user' ? 'Question' : 'Answer';
+    const sources = msg.sources?.length
+      ? '\nSources:\n' + msg.sources.map(s => `[${s.n}] ${sourceLabel(s)}`).join('\n')
+      : '';
+    return `[${msg.timestamp.toLocaleTimeString()}] ${who}: ${msg.content}${sources}`;
+  }).join('\n\n');
+
   const exportChat = () => {
-    const chatContent = messages.map(msg => 
-      `[${msg.timestamp.toLocaleTimeString()}] ${msg.type === 'user' ? 'You' : 'AI'}: ${msg.content}`
-    ).join('\n\n');
-    
-    const blob = new Blob([chatContent], { type: 'text/plain' });
+    const blob = new Blob([transcript()], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `chat-${selectedCurriculumData?.name || 'conversation'}.txt`;
+    a.download = `kfh-answers-${selectedCurriculumData?.name || 'conversation'}.txt`;
     a.click();
   };
 
-  const handleNewChat = async () => {
-    try {
-      // Clear current session and messages
-      setCurrentSession(null);
-      setMessages([]);
-      setError('');
-      
-      // If there's a selected curriculum, create a new session immediately
-      if (selectedCurriculum && selectedCurriculumData) {
-        const newSession = await SessionService.createSession(
-          userId,
-          selectedCurriculumData.name,
-          `Chat with ${selectedCurriculumData.name} Curriculum`,
-          true // isCurriculum = true
-        );
-        setCurrentSession(newSession);
-      }
-    } catch (err) {
-      console.error('Error creating new chat session:', err);
-      setError('Failed to create new chat session');
-    }
-  };
-
-  const copyToClipboard = () => {
-    const chatContent = messages.map(msg => 
-      `${msg.type === 'user' ? 'You' : 'AI'}: ${msg.content}`
-    ).join('\n\n');
-    
-    navigator.clipboard.writeText(chatContent);
+  const handleNewChat = () => {
+    setCurrentSession(null);
+    setMessages([]);
+    setError('');
   };
 
   if (isLoadingData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
+      <div className="min-h-screen bg-background">
         <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-              <p className="text-muted-foreground">Loading curriculums and books...</p>
-            </div>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Loading knowledge bases...</p>
           </div>
         </div>
       </div>
@@ -276,255 +216,219 @@ export default function Chat() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5">
+    <div className="min-h-screen bg-background">
       <Header />
-      
-      <div className="container mx-auto px-4 py-8 h-screen flex flex-col">
-        <div className="max-w-4xl mx-auto flex-1 flex flex-col">
-          {/* Header Section */}
-          <div className="flex items-center gap-4 mb-8">
-            <Button 
-              variant="outline" 
-              onClick={() => navigate('/books')}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Library
-            </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-gradient-primary mb-2">
-                Chat with Your Books
-              </h1>
-              <p className="text-muted-foreground">
-                Ask questions and get AI-powered insights from your academic materials
-              </p>
-            </div>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold mb-2">Ask the documents</h1>
+            <p className="text-muted-foreground">
+              Answers come only from the documents in the selected knowledge base, with sources cited.
+            </p>
           </div>
 
-          {allBooks.length === 0 ? (
+          {curriculums.length === 0 || allBooks.length === 0 ? (
             <Card>
-              <CardContent className="pt-8 pb-8">
-                <div className="text-center">
-                  <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No books available</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Add some books to your library first to start chatting with them.
-                  </p>
-                  <Button onClick={() => navigate('/books/add')} className="bg-gradient-primary">
-                    Add Your First Book
-                  </Button>
-                </div>
+              <CardContent className="py-10 text-center">
+                <FolderOpen className="w-14 h-14 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No documents yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Create a knowledge base and upload documents before asking questions.
+                </p>
+                <Button onClick={() => navigate('/books/add')}>Upload documents</Button>
               </CardContent>
             </Card>
           ) : (
-            <>
-              {/* Curriculum Selection */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GraduationCap className="w-5 h-5 text-primary" />
-                    Select a Curriculum
-                  </CardTitle>
+            <div className="grid lg:grid-cols-[300px_1fr] gap-6">
+              {/* Scope */}
+              <Card className="h-fit">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">What to search</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Curriculum Selection */}
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Curriculum</label>
+                    <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                      <FolderOpen className="w-4 h-4 text-primary" /> Knowledge base
+                    </label>
                     <Select value={selectedCurriculum} onValueChange={handleCurriculumChange}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Choose a curriculum to chat with..." />
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a knowledge base" />
                       </SelectTrigger>
                       <SelectContent>
                         {curriculums.map((curriculum) => (
                           <SelectItem key={curriculum.id} value={curriculum.id.toString()}>
-                            <div className="flex flex-col">
-                              <span className="font-medium">{curriculum.name}</span>
-                              {curriculum.description && (
-                                <span className="text-sm text-muted-foreground">
-                                  {curriculum.description}
-                                </span>
-                              )}
-                            </div>
+                            {curriculum.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {selectedCurriculumData?.description && (
+                      <p className="text-xs text-muted-foreground mt-1.5">{selectedCurriculumData.description}</p>
+                    )}
                   </div>
-                  
+
                   {selectedCurriculumData && (
-                    <div className="mt-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-16 bg-gradient-to-br from-primary to-secondary rounded shadow-sm flex items-center justify-center">
-                          <GraduationCap className="w-6 h-6 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold">{selectedCurriculumData.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {selectedCurriculumData.description || 'Curriculum description'}
-                          </p>
-                          <div className="flex gap-2 mt-2">
-                            <Badge variant="secondary">
-                              {books.length} {books.length === 1 ? 'Book' : 'Books'}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              <GraduationCap className="w-3 h-3 mr-1" />
-                              AI Enhanced
-                            </Badge>
-                          </div>
-                        </div>
+                    <>
+                      <div>
+                        <label className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                          <FileText className="w-4 h-4 text-primary" /> Document
+                        </label>
+                        <Select value={selectedDocument} onValueChange={setSelectedDocument}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={ALL_DOCUMENTS}>All documents ({documents.length})</SelectItem>
+                            {documents.map((doc) => (
+                              <SelectItem key={doc.id} value={doc.id.toString()}>
+                                {formatTitle(doc.title)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    </div>
+
+                      <div>
+                        <label htmlFor="topic" className="text-sm font-medium mb-1.5 flex items-center gap-1.5">
+                          <Target className="w-4 h-4 text-primary" /> Specific point or topic
+                          <span className="text-muted-foreground font-normal">(optional)</span>
+                        </label>
+                        <Input
+                          id="topic"
+                          value={topic}
+                          onChange={(e) => setTopic(e.target.value)}
+                          placeholder="e.g. Murabaha early settlement"
+                          dir="auto"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          Focuses the search on this point for every question you ask.
+                        </p>
+                      </div>
+                    </>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Error Alert */}
-              {error && (
-                <Alert variant="destructive" className="mb-6">
-                  <AlertCircle className="w-4 h-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* Chat Interface */}
-              {selectedCurriculum && (
-                <Card className="flex-1 flex flex-col bg-white shadow-lg">
-                  <CardHeader className="border-b shrink-0">
-                    <div className="flex items-center justify-between">
-                      <CardTitle>Chat Session</CardTitle>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleNewChat}
-                          className="flex items-center gap-2"
-                        >
-                          <Plus className="w-4 h-4" />
-                          NEW CHAT
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={copyToClipboard}
-                          disabled={messages.length === 0}
-                        >
-                          <Copy className="w-4 h-4 mr-2" />
-                          Copy
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={exportChat}
-                          disabled={messages.length === 0}
-                        >
-                          <Download className="w-4 h-4 mr-2" />
-                          Export
-                        </Button>
-                      </div>
+              {/* Conversation */}
+              <Card className="flex flex-col h-[calc(100vh-14rem)] min-h-[480px]">
+                <CardHeader className="border-b py-3 shrink-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="text-base truncate">
+                      {selectedCurriculumData ? selectedCurriculumData.name : 'Conversation'}
+                    </CardTitle>
+                    <div className="flex gap-2 shrink-0">
+                      <Button variant="outline" size="sm" onClick={handleNewChat}>
+                        <Plus className="w-4 h-4 mr-1" /> New
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(transcript())} disabled={messages.length === 0}>
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={exportChat} disabled={messages.length === 0}>
+                        <Download className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </CardHeader>
-                  
-                  <CardContent className="flex-1 flex flex-col p-0 min-h-0">
-                    {/* Messages Area */}
-                    <div className="flex-1 overflow-hidden">
-                      <ScrollArea className="h-full">
-                        <div className="p-6">
-                          {messages.length === 0 ? (
-                            <div className="flex items-center justify-center h-64 text-center">
-                              <div className="space-y-3">
-                                <div className="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-full flex items-center justify-center mx-auto">
-                                  <BookOpen className="w-8 h-8 text-white" />
-                                </div>
-                                <h3 className="text-lg font-semibold">Start Your Conversation</h3>
-                                <p className="text-muted-foreground max-w-md">
-                                  Ask questions about the "{selectedCurriculumData?.name}" curriculum, request explanations, or explore specific topics from all books in this curriculum.
-                                </p>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 flex flex-col p-0 min-h-0">
+                  <ScrollArea className="flex-1">
+                    <div className="p-5">
+                      {!selectedCurriculumData ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center text-muted-foreground">
+                          <FolderOpen className="w-10 h-10 mb-3" />
+                          Choose a knowledge base to start.
+                        </div>
+                      ) : messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-64 text-center">
+                          <MessageSquare className="w-10 h-10 text-primary mb-3" />
+                          <h3 className="text-lg font-semibold">Ask a question</h3>
+                          <p className="text-muted-foreground max-w-md">
+                            For example: "What is the approval limit for personal finance?" or
+                            "ما هي المستندات المطلوبة لفتح حساب؟"
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          {messages.map((message) => (
+                            <div key={message.id} className={cn('flex', message.type === 'user' ? 'justify-end' : 'justify-start')}>
+                              <div className={cn(
+                                'max-w-[88%] rounded-lg px-4 py-3 break-words',
+                                message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted border'
+                              )}>
+                                {message.type === 'user' ? (
+                                  <>
+                                    <p className="whitespace-pre-wrap" dir="auto">{message.content}</p>
+                                    {message.scope && (
+                                      <div className="text-xs opacity-75 mt-1.5">{message.scope}</div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1.5 prose-ul:my-1.5 prose-li:my-0.5" dir="auto">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                                    </div>
+                                    {message.sources && message.sources.length > 0 && (
+                                      <div className="mt-3 pt-2 border-t space-y-1">
+                                        <div className="text-xs font-medium text-muted-foreground">Sources</div>
+                                        {message.sources.map((source) => (
+                                          <details key={source.n} className="text-xs group">
+                                            <summary className="cursor-pointer text-muted-foreground hover:text-foreground list-none">
+                                              <Badge variant="outline" className="mr-1.5 px-1.5 py-0 text-[10px]">{source.n}</Badge>
+                                              {sourceLabel(source)}
+                                            </summary>
+                                            <p className="mt-1 ml-7 text-muted-foreground italic" dir="auto">"{source.excerpt}…"</p>
+                                          </details>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                                <div className="text-[11px] opacity-50 mt-2">{message.timestamp.toLocaleTimeString()}</div>
                               </div>
                             </div>
-                          ) : (
-                            <div className="space-y-6">
-                              {messages.map((message) => (
-                                <div
-                                  key={message.id}
-                                  className={cn(
-                                    'flex gap-3',
-                                    message.type === 'user' ? 'justify-end' : 'justify-start'
-                                  )}
-                                >
-                                  <div
-                                    className={cn(
-                                      'max-w-[85%] rounded-lg px-4 py-3 break-words',
-                                      message.type === 'user'
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted border'
-                                    )}
-                                  >
-                                    <p className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{message.content}</p>
-                                    {message.metadata && (
-                                      <div className="mt-2 flex items-center gap-1 text-xs opacity-75">
-                                        <ExternalLink className="w-3 h-3" />
-                                        <span>Contains external information</span>
-                                      </div>
-                                    )}
-                                    <div className="text-xs opacity-50 mt-2">
-                                      {message.timestamp.toLocaleTimeString()}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                              
-                              {isLoading && (
-                                <div className="flex gap-3">
-                                  <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted border">
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex gap-1">
-                                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-75"></div>
-                                        <div className="w-2 h-2 bg-primary rounded-full animate-pulse delay-150"></div>
-                                      </div>
-                                      <span className="text-sm text-muted-foreground">AI is thinking...</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                              
-                              <div ref={messagesEndRef} />
+                          ))}
+
+                          {isLoading && (
+                            <div className="flex">
+                              <div className="rounded-lg px-4 py-3 bg-muted border flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                                <span className="text-sm text-muted-foreground">Searching documents...</span>
+                              </div>
                             </div>
                           )}
+                          <div ref={messagesEndRef} />
                         </div>
-                      </ScrollArea>
+                      )}
                     </div>
-                    
-                    {/* Input Area */}
-                    <div className="border-t p-4 shrink-0">
-                      
-                      <div className="flex gap-3">
-                        <Textarea
-                          ref={textareaRef}
-                          value={currentMessage}
-                          onChange={(e) => setCurrentMessage(e.target.value)}
-                          onKeyDown={handleKeyPress}
-                          placeholder="Ask a question about the book..."
-                          className="min-h-[60px] resize-none"
-                          disabled={isLoading}
-                        />
-                        <Button
-                          onClick={handleSendMessage}
-                          disabled={!currentMessage.trim() || isLoading}
-                          className="px-6"
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
+                  </ScrollArea>
+
+                  {error && (
+                    <Alert variant="destructive" className="mx-4 mb-2 w-auto">
+                      <AlertCircle className="w-4 h-4" />
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="border-t p-4 shrink-0">
+                    <div className="flex gap-3">
+                      <Textarea
+                        value={currentMessage}
+                        onChange={(e) => setCurrentMessage(e.target.value)}
+                        onKeyDown={handleKeyPress}
+                        placeholder={selectedCurriculumData ? `Ask about ${describeScope()}...` : 'Choose a knowledge base first'}
+                        className="min-h-[56px] resize-none"
+                        disabled={isLoading || !selectedCurriculumData}
+                        dir="auto"
+                      />
+                      <Button onClick={handleSendMessage} disabled={!currentMessage.trim() || isLoading || !selectedCurriculumData} className="px-5 self-end h-[56px]">
+                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>

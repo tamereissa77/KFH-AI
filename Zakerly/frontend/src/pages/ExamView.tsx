@@ -63,22 +63,22 @@ export default function ExamView() {
       setError('');
 
       // Build comprehensive user message based on all parameters
-      let userMessage = `Generate ${questionCount} exam questions`;
+      let userMessage = `Generate ${questionCount} quiz questions`;
       
       if (difficulty.length > 0) {
         userMessage += ` with ${difficulty.join(', ')} difficulty level${difficulty.length > 1 ? 's' : ''}`;
       }
       
       if (timeLimit) {
-        userMessage += ` for a ${timeLimit}-minute exam`;
+        userMessage += ` for a ${timeLimit}-minute quiz`;
       }
       
       if (scopeType === 'whole_curriculum') {
-        userMessage += ` covering the entire curriculum content`;
+        userMessage += ` covering the entire knowledge base content`;
       } else if (scopeType === 'specific_topics' && specificTopics) {
         userMessage += ` focusing specifically on: ${specificTopics}`;
       } else {
-        userMessage += ` covering the entire book content`;
+        userMessage += ` covering the entire document content`;
       }
 
       const request: QuestionGenerationRequest = {
@@ -94,7 +94,7 @@ export default function ExamView() {
         time_limit: timeLimit
       };
 
-      console.log('Generating exam with comprehensive parameters:', request);
+      console.log('Generating quiz with comprehensive parameters:', request);
       
       const response = await ChatService.generateQuestions(request);
       
@@ -116,7 +116,7 @@ export default function ExamView() {
 
       const exam: ExamData = {
         id: `exam_${Date.now()}`,
-        title: `${bookTitle} - ${difficulty.join('/')} Level Exam`,
+        title: `${bookTitle} - ${difficulty.join('/')} Level Quiz`,
         book: bookTitle!,
         difficulty: difficulty.join(', '),
         timeLimit: timeLimit,
@@ -127,11 +127,11 @@ export default function ExamView() {
       };
 
       setExamData(exam);
-      console.log('Generated exam:', exam);
+      console.log('Generated quiz:', exam);
       
     } catch (err) {
-      console.error('Error generating exam preview:', err);
-      setError(err instanceof Error ? err.message : 'Failed to generate exam preview');
+      console.error('Error generating quiz preview:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate quiz preview');
     } finally {
       setIsLoading(false);
     }
@@ -141,7 +141,7 @@ export default function ExamView() {
     if (bookTitle) {
       generateExamPreview();
     } else {
-      setError('No book selected for exam generation');
+      setError('No document selected for quiz generation');
       setIsLoading(false);
     }
   }, [bookTitle, generateExamPreview]);
@@ -261,8 +261,8 @@ export default function ExamView() {
             <Card className="text-center">
               <CardContent className="pt-6">
                 <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" />
-                <h2 className="text-xl font-semibold mb-2">Generating Exam Preview</h2>
-                <p className="text-muted-foreground">Please wait while we prepare your exam...</p>
+                <h2 className="text-xl font-semibold mb-2">Generating Quiz Preview</h2>
+                <p className="text-muted-foreground">Please wait while we prepare your quiz...</p>
               </CardContent>
             </Card>
           </div>
@@ -279,11 +279,11 @@ export default function ExamView() {
           <div className="max-w-4xl mx-auto">
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error || 'Failed to load exam data'}</AlertDescription>
+              <AlertDescription>{error || 'Failed to load quiz data'}</AlertDescription>
             </Alert>
             <div className="text-center mt-6">
               <Button onClick={() => navigate('/exams')}>
-                Return to Exam Generator
+                Return to Quiz Generator
               </Button>
             </div>
           </div>
@@ -364,7 +364,7 @@ export default function ExamView() {
                   className="flex flex-col items-center gap-2 h-auto p-4"
                 >
                   <Play className="w-6 h-6" />
-                  <span>Take Exam</span>
+                  <span>Take Quiz</span>
                 </Button>
                 
                 <Button 

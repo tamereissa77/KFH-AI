@@ -134,7 +134,7 @@ export default function SignUp() {
             </h1>
           </div>
           <p className="text-muted-foreground">
-            Join thousands of learners using AI to excel academically
+            Create your account for the KFH internal knowledge assistant
           </p>
         </div>
 
@@ -279,7 +279,7 @@ export default function SignUp() {
         <div className="mt-8 text-center">
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <BookOpen className="w-4 h-4" />
-            <span>Free to start • No credit card required • Cancel anytime</span>
+            <span>For KFH employees only</span>
           </div>
         </div>
       </div>

@@ -1,7 +1,8 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import json
 import os
+import re
 import asyncio
 import asyncpg
 from datetime import datetime
@@ -33,6 +34,12 @@ from utils import RedisManager
 from memory import SimpleMemoryManager
 
 logger = logging.getLogger(__name__)
+
+
+def format_title(title: str) -> str:
+    """Readable document title: stored titles are identifier-style (e.g. ACCOUNT_OPENING_PROCEDURE)"""
+    text = title.replace('_', ' ').strip()
+    return text.title() if text.isupper() else text
 
 class SearchInput(BaseModel):
     """Input schema for knowledge base search tool"""
@@ -153,33 +160,17 @@ Remember: You're here to facilitate learning through conversation. Make educatio
             ("human", "{user_message}")
         ])
         
-        # Strict RAG-based response prompt - ONLY use provided curriculum content
+        # Strict RAG prompt for KFH staff: answer ONLY from retrieved internal documents
         self.simple_chat_prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert educational AI assistant with STRICT knowledge boundaries.
+            ("system", """You are the KFH internal knowledge assistant. Bank employees ask you about internal documents: policies, procedures, product terms, circulars and regulations.
 
-**CRITICAL RULES - YOU MUST FOLLOW THESE:**
-
-1. **ONLY USE PROVIDED CONTENT**: You may ONLY answer questions using information explicitly provided in the curriculum knowledge base content given to you.
-
-2. **NO EXTERNAL KNOWLEDGE**: Do NOT use any general knowledge, internet information, or training data. If information is not in the provided content, you MUST say so.
-
-3. **MANDATORY CITATION**: You MUST end EVERY response with: (Source: Internal Knowledge Base)
-
-4. **HONEST LIMITATIONS**: If the provided content doesn't contain enough information to fully answer the question, clearly state:
-   - What information you CAN provide from the content
-   - What information is NOT available in the provided content
-   - Suggest the user ask a more specific question about topics in the curriculum
-
-5. **PROFESSIONAL STRUCTURE**: Organize answers with clear sections:
-   - 🎯 **Direct Answer**: Start with the main point
-   - 📚 **Detailed Explanation**: Expand using ONLY provided content
-   - 🔑 **Key Concepts**: Highlight important terms from the content
-   - 💡 **Examples**: Use ONLY examples from the provided content
-
-6. **IF NO RELEVANT CONTENT**: If you receive a question but the provided content is not relevant, you MUST respond:
-"I apologize, but the curriculum content provided does not contain information about this topic. Please ask about topics covered in the available curriculum materials. (Source: Internal Knowledge Base)"
-
-Remember: Your credibility depends on being honest about your knowledge boundaries. It's better to say "The provided content doesn't cover this" than to provide information from outside sources."""),
+RULES:
+1. Answer ONLY from the numbered document excerpts you are given. Never use outside knowledge, assumptions or general banking knowledge.
+2. Cite every factual statement with the excerpt number in square brackets, e.g. [1] or [2][3].
+3. If the excerpts do not answer the question, say clearly that the documents provided do not cover it, and state what they do cover if relevant. Never guess.
+4. Be precise and concise: lead with the direct answer, then the supporting details. Quote exact figures, limits, conditions and deadlines as written in the documents.
+5. Use short bullet points for lists of conditions, steps or requirements.
+6. Reply in the same language as the employee's question (Arabic or English)."""),
             ("human", "{user_message}")
         ])
 
@@ -201,8 +192,8 @@ Remember: Your credibility depends on being honest about your knowledge boundari
                 request.user_message
             )
             
-            # Determine curriculum context
-            curriculum_context = session.curriculum_name or session.book_title or "General Education"
+            # Determine knowledge base context
+            curriculum_context = session.curriculum_name or session.book_title or "General"
             
             # Parse user intent using router
             try:
@@ -236,16 +227,18 @@ Remember: Your credibility depends on being honest about your knowledge boundari
                 user_message = request.user_message
             
             # Route based on intent
+            sources = []
             if intent == 'generate_questions':
-                response_text = "I understand you want to generate questions. For question generation, please use the dedicated exam generation feature available in the application interface. I'm here to help with educational conversations and explanations about the curriculum content."
+                response_text = "To create a quiz, please use the Policy Quizzes section. Here I can answer questions about the documents in this knowledge base."
                 
             elif intent == 'generate_lecture':
-                response_text = "I understand you want to create lecture content. For lecture generation, please use the dedicated script generation feature available in the application interface. I'm here to help with educational conversations and explanations about the curriculum content."
+                response_text = "I can answer questions about the documents in this knowledge base. Please ask about a specific policy, procedure, product or topic."
                 
             else:
-                # Handle as regular chat conversation
-                response_text = await self._handle_educational_chat(
-                    user_message, request.session_id, curriculum_context, book_title
+                # Answer from the knowledge base documents
+                response_text, sources = await self._handle_educational_chat(
+                    user_message, request.session_id, curriculum_context,
+                    book_id=request.book_id, topic=request.topic
                 )
             
             # Save AI response to history
@@ -261,7 +254,7 @@ Remember: Your credibility depends on being honest about your knowledge boundari
                 response=response_text,
                 session_id=request.session_id,
                 intent=request.intent or "answer_question",
-                metadata={"curriculum_context": curriculum_context}
+                metadata={"curriculum_context": curriculum_context, "sources": sources}
             )
             
         except Exception as e:
@@ -340,162 +333,110 @@ Remember: Your credibility depends on being honest about your knowledge boundari
             logger.error(f"❌ Error getting chunks for curriculum topics: {e}")
             return []
 
-    async def _handle_educational_chat(self, user_message: str, session_id: str, curriculum_context: str, book_title: str = None) -> str:
-        """Handle educational chat with STRICT RAG + MEMORY - using LangChain message format like backup"""
+    async def _handle_educational_chat(self, user_message: str, session_id: str, curriculum_context: str,
+                                       book_id: Optional[int] = None, topic: Optional[str] = None) -> Tuple[str, List[Dict[str, Any]]]:
+        """Answer strictly from the knowledge base documents, optionally scoped to one document and/or a topic.
+
+        Returns the answer text and the list of sources (numbered as cited in the answer).
+        """
+        not_found = ("The documents in this knowledge base do not contain information about this question. "
+                     "Try rephrasing it, choosing a different document, or asking about a specific policy or topic.")
         try:
-            logger.info(f"📚 STRICT RAG MODE with MEMORY: Searching curriculum '{curriculum_context}'")
-            
-            # STEP 1: RETRIEVE CONVERSATION MEMORY (from DB) - Like backup file
-            # Get chat history as LangChain message objects
+            logger.info(f"📚 Knowledge base '{curriculum_context}' | document={book_id} | topic={topic!r}")
+
+            # STEP 1: Conversation memory
             chat_history = await self._get_session_chat_history(session_id, limit=10)
-            
-            logger.info(f"💭 Retrieved {len(chat_history)} messages from conversation history")
-            
-            # STEP 2: INTELLIGENT QUERY REWRITING (if there's conversation history)
-            # Use LLM to understand what the user is actually asking about based on context
+
+            # STEP 2: Rewrite follow-up questions ("what about that?") into standalone search queries
             search_query = user_message
             if chat_history:
-                # Build conversation context for query rewriting
-                history_for_rewrite = []
-                for msg in chat_history[-4:]:  # Last 4 messages for context
-                    role = "Student" if isinstance(msg, HumanMessage) else "Tutor"
-                    history_for_rewrite.append(f"{role}: {msg.content[:200]}")  # Limit length
-                
-                history_text = "\n".join(history_for_rewrite)
-                
-                # Use LLM to rewrite query if it contains references (it, that, this, etc.)
+                history_text = "\n".join(
+                    f"{'Employee' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content[:200]}"
+                    for msg in chat_history[-4:]
+                )
                 rewrite_prompt = f"""Given this conversation history:
 
 {history_text}
 
-Current user question: "{user_message}"
+Current question: "{user_message}"
 
-If the user's question contains pronouns or references (like "it", "that", "this", "explain again", "more details", etc.), rewrite it as a standalone search query that captures the actual topic being discussed.
+If the question contains references (like "it", "that", "this", "more details"), rewrite it as a standalone search query that captures the actual topic. If it is already standalone, return it as-is.
 
-If the question is already clear and standalone, return it as-is.
-
-Return ONLY the rewritten query, nothing else."""
-
+Return ONLY the query, nothing else."""
                 try:
-                    rewrite_chain = self.simple_chat_prompt | self.llm | StrOutputParser()
-                    search_query = await rewrite_chain.ainvoke({"user_message": rewrite_prompt})
-                    search_query = search_query.strip()
-                    logger.info(f"🔄 Rewrote query: '{user_message[:50]}...' → '{search_query[:50]}...'")
+                    search_query = (await self.llm.ainvoke(rewrite_prompt)).content.strip() or user_message
+                    logger.info(f"🔄 Rewrote query: '{user_message[:50]}' → '{search_query[:50]}'")
                 except Exception as e:
                     logger.warning(f"⚠️ Query rewrite failed, using original: {e}")
-                    search_query = user_message
-            
-            # STEP 3: Search vector database with the intelligent query
-            retrieved_chunks = await self._search_curriculum_embeddings(
-                curriculum_name=curriculum_context,
-                query=search_query,  # Use rewritten query for better retrieval
-                k=6  # Retrieve top 6 most relevant chunks
-            )
-            
-            # STEP 4: Check if we found relevant content
-            if not retrieved_chunks:
-                logger.warning(f"❌ No relevant content found in vector database for query: {user_message[:100]}")
-                return "I apologize, but I couldn't find any relevant information about your question in the available curriculum materials. Please try rephrasing your question or ask about topics covered in the curriculum content.\n\n(Source: Internal Knowledge Base)"
-            
-            logger.info(f"✅ Found {len(retrieved_chunks)} relevant chunks from vector database")
-            
-            # STEP 5: Build context from retrieved chunks
-            context_parts = []
-            for i, chunk in enumerate(retrieved_chunks, 1):
-                try:
-                    content = chunk.get('content', '') if isinstance(chunk, dict) else str(chunk)
-                    metadata = chunk.get('metadata') if isinstance(chunk, dict) else None
-                    
-                    # Handle metadata - it might be None, dict, or JSON string
-                    if metadata is None:
-                        book = 'Unknown Book'
-                    elif isinstance(metadata, dict):
-                        book = metadata.get('book_title', 'Unknown Book')
-                    else:
-                        # Try to parse as JSON if it's a string
-                        try:
-                            import json
-                            metadata_dict = json.loads(metadata) if isinstance(metadata, str) else {}
-                            book = metadata_dict.get('book_title', 'Unknown Book')
-                        except:
-                            book = 'Unknown Book'
-                    
-                    if content:
-                        context_parts.append(f"[Source {i} - {book}]:\n{content}")
-                except Exception as e:
-                    logger.error(f"Error processing chunk {i}: {e}")
-                    continue
-            
-            if not context_parts:
-                logger.warning(f"❌ Chunks found but no valid content extracted")
-                return "I apologize, but I couldn't extract valid information from the curriculum materials. Please try rephrasing your question.\n\n(Source: Internal Knowledge Base)"
-            
-            combined_context = "\n\n".join(context_parts)
-            
-            # STEP 6: Build conversation history context from LangChain messages
-            history_context = ""
-            if chat_history:
-                history_lines = []
-                for msg in chat_history:
-                    role = "Student" if isinstance(msg, HumanMessage) else "Tutor"
-                    history_lines.append(f"{role}: {msg.content}")
-                history_context = "\n".join(history_lines)
-                logger.info(f"💬 Including {len(chat_history)} messages as conversation context")
-            
-            # STEP 7: Create enhanced prompt WITH conversation history and STRICT instructions
-            if history_context:
-                # Include conversation history for context-aware responses
-                enhanced_message = f"""**CONVERSATION HISTORY:**
-{history_context}
+            if topic:
+                search_query = f"{topic}: {search_query}"
 
-**CURRICULUM KNOWLEDGE BASE CONTENT:**
-{combined_context}
-
-**CURRENT USER QUESTION:** {user_message}
-
-**CRITICAL INSTRUCTIONS:**
-- You MUST answer ONLY based on the curriculum content provided above
-- Use the conversation history to understand context and references (e.g., "it", "that concept", "explain more", "what about...")
-- If the user refers to something from the previous conversation, acknowledge it
-- If the provided content doesn't fully answer the question, clearly state what information is missing
-- Do NOT use any external knowledge or general information
-- Structure your response professionally with clear sections
-- ALWAYS end your response with: (Source: Internal Knowledge Base)
-
-Please provide a comprehensive answer using ONLY the information from the curriculum content above, while considering the conversation context."""
+            # STEP 3: Vector search, across the knowledge base or within one document
+            query_embedding = await self.embeddings.aembed_query(search_query)
+            if book_id:
+                retrieved_chunks = await self.db.search_book_specific_embeddings(
+                    curriculum_context, book_id, query_embedding, limit=6
+                )
             else:
-                # First message in conversation - no history
-                enhanced_message = f"""**CURRICULUM KNOWLEDGE BASE CONTENT:**
+                retrieved_chunks = await self.db.search_curriculum_embeddings(
+                    curriculum_context, query_embedding, limit=6
+                )
+            if not retrieved_chunks:
+                logger.warning(f"❌ No content found for: {user_message[:100]}")
+                return not_found, []
 
-{combined_context}
+            # STEP 4: Number the excerpts and collect their sources
+            context_parts, sources = [], []
+            for i, chunk in enumerate(retrieved_chunks, 1):
+                content = chunk.get('content', '') if isinstance(chunk, dict) else str(chunk)
+                if not content:
+                    continue
+                metadata = chunk.get('metadata') if isinstance(chunk, dict) else None
+                if isinstance(metadata, str):
+                    try:
+                        metadata = json.loads(metadata)
+                    except json.JSONDecodeError:
+                        metadata = None
+                metadata = metadata or {}
+                document = format_title(metadata.get('book_title') or metadata.get('file_name') or 'Document')
+                page = metadata.get('page')
+                label = f"{document}, p. {page}" if page else document
+                n = len(sources) + 1
+                context_parts.append(f"[{n}] ({label})\n{content}")
+                sources.append({"n": n, "document": document, "page": page, "excerpt": content[:300]})
 
-**USER QUESTION:** {user_message}
+            if not context_parts:
+                return not_found, []
 
-**CRITICAL INSTRUCTIONS:**
-- You MUST answer ONLY based on the curriculum content provided above
-- Do NOT use any external knowledge or general information
-- If the provided content doesn't fully answer the question, clearly state what information is missing
-- Structure your response professionally with clear sections
-- ALWAYS end your response with: (Source: Internal Knowledge Base)
+            history_block = ""
+            if chat_history:
+                history_block = "CONVERSATION SO FAR:\n" + "\n".join(
+                    f"{'Employee' if isinstance(msg, HumanMessage) else 'Assistant'}: {msg.content}"
+                    for msg in chat_history
+                ) + "\n\n"
+            focus_block = f"FOCUS TOPIC: {topic}\n\n" if topic else ""
 
-Please provide a comprehensive answer using ONLY the information from the curriculum content above."""
-            
-            # STEP 8: Generate response using ONLY the retrieved content with conversation awareness
+            prompt = f"""{history_block}DOCUMENT EXCERPTS:
+{chr(10).join(context_parts)}
+
+{focus_block}EMPLOYEE QUESTION: {user_message}
+
+Answer using ONLY the excerpts above and cite them as [n]. If they do not answer the question, say so."""
+
+            # STEP 5: Generate the grounded answer
             chain = self.simple_chat_prompt | self.llm | StrOutputParser()
-            result = await chain.ainvoke({"user_message": enhanced_message})
-            
-            # STEP 9: Verify the response includes the citation
-            if "(Source: Internal Knowledge Base)" not in result:
-                result += "\n\n(Source: Internal Knowledge Base)"
-            
-            logger.info(f"✅ Strict RAG response with memory context generated successfully")
-            return result
-            
+            result = await chain.ainvoke({"user_message": prompt})
+            logger.info("✅ Grounded answer generated")
+
+            # Only list the excerpts the answer actually cites
+            cited = {int(n) for n in re.findall(r"\[(\d+)\]", result)}
+            return result.strip(), [src for src in sources if src["n"] in cited]
+
         except Exception as e:
-            logger.error(f"❌ Error in educational chat: {e}")
+            logger.error(f"❌ Error answering from knowledge base: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
-            return "I apologize, but I encountered an error while processing your question. Please try again.\n\n(Source: Internal Knowledge Base)"
+            return "Sorry, something went wrong while searching the documents. Please try again.", []
 
     async def _get_session_chat_history(self, session_id: str, limit: int = 10) -> List[Any]:
         """Get recent chat history for context"""
@@ -566,51 +507,6 @@ Please provide a comprehensive answer using ONLY the information from the curric
             func=search_book
         )
 
-    def _create_web_search_tool(self) -> Tool:
-        """Create web search tool for additional information"""
-        async def web_search(query: str) -> str:
-            """Search the web for additional information"""
-            try:
-                # Check if Tavily API is available
-                tavily_api_key = os.getenv("TAVILY_API_KEY")
-                if not tavily_api_key:
-                    return "Web search is not available at the moment."
-                
-                # Use Tavily API for web search
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(
-                        "https://api.tavily.com/search",
-                        headers={
-                            "Authorization": f"Bearer {tavily_api_key}",
-                            "Content-Type": "application/json"
-                        },
-                        json={"query": query}
-                    )
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        results = data.get('results', [])
-                        
-                        # Format results
-                        formatted_results = []
-                        for result in results[:3]:  # Top 3 results
-                            formatted_results.append(f"Title: {result.get('title', 'N/A')}\nContent: {result.get('content', 'N/A')}")
-                        
-                        return "\n\n".join(formatted_results) if formatted_results else "No web search results found."
-                    else:
-                        return "Web search failed - API error."
-                        
-            except Exception as e:
-                logger.error(f"Error in web search: {e}")
-                return "Web search encountered an error."
-        
-        return Tool(
-            name="web_search",
-            description="Search the web for information when the internal knowledge base doesn't have the answer.",
-            func=web_search
-        )
-
-    # Session Management Methods
     async def create_chat_session(self, user_id: str, curriculum_name: str = None, book_title: str = None, session_name: str = None) -> ChatSessionModel:
         """Create a new chat session for curriculum or book-based conversations"""
         try:

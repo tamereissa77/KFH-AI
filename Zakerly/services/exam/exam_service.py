@@ -198,7 +198,7 @@ class ExamService:
                 curriculum_name, all_chunks, curriculum_topics, exam_parameters
             )
             
-            if questions and len(questions) >= exam_parameters.get('count', 5):
+            if questions:  # keep partial results; fewer real questions beat placeholders
                 logger.info(f"✅ STEP 3 DONE: Generated {len(questions)} comprehensive questions")
                 return questions[:exam_parameters.get('count', 5)]
             else:
@@ -481,7 +481,7 @@ Focus on specific technical terms, concepts, and subject areas."""),
                 exam_parameters=exam_parameters
             )
             
-            if questions and len(questions) >= exam_parameters['count']:
+            if questions:  # keep partial results; fewer real questions beat placeholders
                 logger.info(f"✅ SUCCESS: Generated {len(questions)} questions")
                 return questions[:exam_parameters['count']]
             else:
@@ -692,7 +692,7 @@ Maximum 12 keywords."""),
                 exam_parameters=exam_parameters
             )
             
-            if questions and len(questions) >= exam_parameters['count']:
+            if questions:  # keep partial results; fewer real questions beat placeholders
                 logger.info(f"✅ SUCCESS: Generated {len(questions)} questions")
                 return questions[:exam_parameters['count']]
             else:
@@ -764,39 +764,39 @@ Return ONLY a JSON array: ["term1", "term2", ...]"""),
                 logger.error(f"❌ Content too short")
                 return []
             
-            difficulty = exam_parameters.get('difficulty', ['medium'])[0]
-            question_type = exam_parameters.get('question_types', ['multiple_choice_single_answer'])[0]
+            difficulties = exam_parameters.get('difficulty') or ['medium']
+            question_types = exam_parameters.get('question_types') or ['multiple_choice_single_answer']
+            difficulty = ", ".join(difficulties)
+            question_type = ", ".join(question_types)
             count = exam_parameters.get('count', 10)
-            
-            # Sophisticated prompt
+
+            # Training quiz prompt for KFH staff, grounded in the internal documents
             question_prompt = ChatPromptTemplate.from_messages([
-                ("system", f"""You are a professional exam creator. Generate EXACTLY {count} technical exam questions.
+                ("system", f"""You create training and compliance quizzes for KFH bank employees, based ONLY on internal bank documents (policies, procedures, product terms, regulations).
 
-STRICTLY FORBIDDEN PHRASES - DO NOT USE:
-❌ "According to the content"
-❌ "According to the text" 
-❌ "As described in Chapter X"
-❌ "What does Chapter X cover"
-❌ "The book states"
-❌ "Based on the provided content"
+Generate EXACTLY {count} questions that check whether an employee knows and can apply what the document says.
 
-REQUIRED QUESTION STYLE:
-✅ Write direct technical questions
-✅ Professional certification exam style
-✅ No source material references
+RULES:
+- Every question and correct answer must be fully supported by the content provided. Do not use outside knowledge.
+- Prefer practical, job-relevant questions: limits, eligibility conditions, required steps, approvals, deadlines, prohibited actions, customer scenarios.
+- Write direct questions; do not say "according to the text" or refer to chapters.
+- Spread the questions across these difficulties: {difficulty}
+- Spread the questions across these types: {question_type}
+- For true/false questions use options ["True", "False"].
+- Write in the same language as the content (Arabic or English).
 
 JSON FORMAT:
-Return a JSON array with {count} objects:
-- "difficulty": "{difficulty}"
-- "type": "{question_type}"
-- "question_text": "Direct technical question"
-- "options": ["A", "B", "C", "D"] (for multiple choice)
-- "answer": "Correct answer"
+Return ONLY a JSON array with {count} objects:
+- "difficulty": one of: {difficulty}
+- "type": one of: {question_type}
+- "question_text": the question
+- "options": list of answer options (4 for multiple choice)
+- "answer": the correct option, exactly as written in options
 
 Generate EXACTLY {count} questions."""),
-                ("human", "Content:\n\n{content}\n\nGenerate {count} {difficulty} questions.")
+                ("human", "Content:\n\n{content}\n\nGenerate {count} questions.")
             ])
-            
+
             chain = question_prompt | self.get_current_llm() | StrOutputParser()
             
             result = await chain.ainvoke({
@@ -992,30 +992,7 @@ Generate EXACTLY {count} questions."""),
             return []
 
     def _generate_default_questions(self, exam_parameters: Dict[str, Any], topics: List[str]) -> List[Question]:
-        """Generate default fallback questions"""
-        try:
-            questions = []
-            count = exam_parameters.get('count', 5)
-            difficulty = exam_parameters.get('difficulty', ['medium'])[0]
-            
-            for i in range(min(count, len(topics) * 2)):
-                topic = topics[i % len(topics)] if topics else "General Topic"
-                question = Question(
-                    difficulty=difficulty,
-                    type="multiple_choice_single_answer",
-                    question_text=f"What is a key concept related to {topic}?",
-                    options=[
-                        f"Primary aspect of {topic}",
-                        f"Secondary feature of {topic}",
-                        f"Alternative approach to {topic}",
-                        f"Unrelated concept"
-                    ],
-                    answer=f"Primary aspect of {topic}"
-                )
-                questions.append(question)
-            
-            return questions[:count]
-            
-        except Exception as e:
-            logger.error(f"❌ Error generating default questions: {e}")
-            return []
+        """Fallback when generation fails: return no questions rather than placeholder questions
+        with invented answers, which would be misleading in a staff training quiz."""
+        logger.warning(f"⚠️ Question generation failed for topics {topics[:3]}; returning no questions")
+        return []

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTitle } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/ui/header';
 import { Button } from '@/components/ui/button';
@@ -229,7 +230,7 @@ export default function Dashboard() {
     books.slice(0, 3).forEach(book => {
       activities.push({
         type: 'book',
-        title: `Added "${book.title}"`,
+        title: `Added "${formatTitle(book.title)}"`,
         time: getRelativeTime(book.created_at),
         icon: BookOpen
       });
@@ -290,64 +291,34 @@ export default function Dashboard() {
     const userName = getUserFirstName();
 
     if (stats.totalBooks === 0) {
-      return `Welcome to Zakerly, ${userName}! Start by adding your first book to begin your learning journey.`;
+      return `Welcome, ${userName}. Start by uploading documents to a knowledge base.`;
     }
-    
-    if (recentBooksCount > 0 && recentScriptsCount === 0) {
-      return `Great start, ${userName}! You've added ${recentBooksCount} book${recentBooksCount > 1 ? 's' : ''}. Now try creating your first lecture script.`;
-    }
-    
+
     if (stats.totalSessions === 0) {
-      return `Ready to dive deeper, ${userName}? Start a chat session with your books to unlock AI-powered insights.`;
+      return `Welcome, ${userName}. Ask a question about any KFH document to get an answer with sources.`;
     }
-    
-    if (stats.totalBooks > 5 && stats.totalScripts > 3) {
-      return `Impressive progress, ${userName}! You're building a comprehensive learning library. Keep it up! 🌟`;
-    }
-    
-    if (stats.totalSessions > 10) {
-      return `You're on fire, ${userName}! ${stats.totalSessions} chat sessions completed. Your dedication is inspiring! 🔥`;
-    }
-    
-    return `Keep up the excellent work with your learning journey, ${userName}! 📚`;
+
+    return `Welcome back, ${userName}. ${stats.totalBooks} document${stats.totalBooks === 1 ? '' : 's'} available to search.`;
   };
 
   const statCards = [
-    { 
-      label: "Books in Library", 
-      value: stats.totalBooks, 
-      icon: BookOpen, 
-      color: "text-primary", 
+    {
+      label: "Documents",
+      value: stats.totalBooks,
+      icon: BookOpen,
+      color: "text-primary",
       bgColor: "bg-primary/10",
       action: () => navigate('/books'),
-      description: "Total books added"
-    },
-    { 
-      label: "Lecture Scripts", 
-      value: stats.totalScripts, 
-      icon: FileText, 
-      color: "text-accent", 
-      bgColor: "bg-accent/10",
-      action: () => navigate('/scripts'),
-      description: "Scripts created"
-    },
-    { 
-      label: "Chat Sessions", 
-      value: stats.totalSessions, 
-      icon: MessageCircle, 
-      color: "text-green-600", 
-      bgColor: "bg-green-100",
-      action: () => navigate('/chat'),
-      description: "AI conversations"
+      description: "Searchable in knowledge bases"
     },
     {
-      label: "Learning Hours",
-      value: Math.round(stats.totalSessions * 0.5), // Estimate 30 min per session
-      icon: Clock,
-      color: "text-orange-600",
-      bgColor: "bg-orange-100",
-      action: () => setSelectedTab("overview"),
-      description: "Time invested"
+      label: "Question Sessions",
+      value: stats.totalSessions,
+      icon: MessageCircle,
+      color: "text-accent",
+      bgColor: "bg-accent/10",
+      action: () => navigate('/chat'),
+      description: "Conversations with the documents"
     }
   ];
 
@@ -382,7 +353,7 @@ export default function Dashboard() {
                     {greeting}, {getUserFirstName()}! 👋
                   </h1>
                   <p className="text-gray-600">
-                    Ready to continue your learning journey?
+                    What do you need to find today?
                   </p>
                 </div>
                 <div className="flex items-center space-x-6">
@@ -436,7 +407,7 @@ export default function Dashboard() {
           </div>
 
           {/* Enhanced Stats Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
             {statCards.map((stat, index) => (
               <Card 
                 key={index} 
@@ -469,23 +440,23 @@ export default function Dashboard() {
                     <Plus className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Add New Book</h3>
-                    <p className="text-sm text-muted-foreground">Expand your library</p>
+                    <h3 className="font-semibold">Upload documents</h3>
+                    <p className="text-sm text-muted-foreground">Add to a knowledge base</p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate('/scripts')}>
+            <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate('/exams')}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <FileText className="w-6 h-6 text-accent" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Create Script</h3>
-                    <p className="text-sm text-muted-foreground">Generate lecture content</p>
+                    <h3 className="font-semibold">Create a policy quiz</h3>
+                    <p className="text-sm text-muted-foreground">Check staff knowledge</p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -495,12 +466,12 @@ export default function Dashboard() {
             <Card className="hover:shadow-lg transition-all duration-200 cursor-pointer group" onClick={() => navigate('/chat')}>
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <MessageCircle className="w-6 h-6 text-green-600" />
+                  <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <MessageCircle className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Start Chat</h3>
-                    <p className="text-sm text-muted-foreground">AI-powered learning</p>
+                    <h3 className="font-semibold">Ask the documents</h3>
+                    <p className="text-sm text-muted-foreground">Answers with sources</p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -521,18 +492,18 @@ export default function Dashboard() {
               </TabsTrigger>
               <TabsTrigger value="library" className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
-                My Library
+                Documents
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Learning Streak */}
+                {/* Activity Streak */}
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2">
                       <Flame className="w-5 h-5 text-orange-500" />
-                      Learning Momentum
+                      Activity Streak
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -558,7 +529,7 @@ export default function Dashboard() {
                         ))}
                       </div>
                       <p className="text-sm text-center text-muted-foreground">
-                        Keep learning daily to maintain your streak!
+                        Days with activity this week.
                       </p>
                     </div>
                   </CardContent>
@@ -575,15 +546,11 @@ export default function Dashboard() {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Books Added</span>
+                        <span className="text-sm text-muted-foreground">Documents added</span>
                         <span className="font-semibold">{recentBooks.length}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Scripts Created</span>
-                        <span className="font-semibold">{recentScripts.length}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-muted-foreground">Chat Sessions</span>
+                        <span className="text-sm text-muted-foreground">Question sessions</span>
                         <span className="font-semibold">{recentSessions.length}</span>
                       </div>
                       <div className="pt-4 border-t">
@@ -592,7 +559,7 @@ export default function Dashboard() {
                           <span className="text-sm">
                             {stats.totalBooks + stats.totalScripts + stats.totalSessions > 0 
                               ? "Great progress this week!" 
-                              : "Start your learning journey today!"}
+                              : "Ask your first question today!"}
                           </span>
                         </div>
                       </div>
@@ -638,7 +605,7 @@ export default function Dashboard() {
                       <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                       <p className="text-muted-foreground">No recent activity</p>
                       <p className="text-sm text-muted-foreground mt-2">
-                        Start by adding a book or creating your first script!
+                        Start by uploading documents or asking a question.
                       </p>
                     </div>
                   )}
@@ -647,13 +614,13 @@ export default function Dashboard() {
             </TabsContent>
 
             <TabsContent value="library">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Recent Books */}
+              <div className="grid grid-cols-1 gap-6">
+                {/* Recent Documents */}
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="flex items-center gap-2">
                       <BookOpen className="w-5 h-5" />
-                      Recent Books
+                      Recent Documents
                     </CardTitle>
                     <Button variant="outline" size="sm" onClick={() => navigate('/books')}>
                       View All
@@ -668,7 +635,7 @@ export default function Dashboard() {
                               <BookOpen className="w-5 h-5 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{book.title}</p>
+                              <p className="font-medium truncate">{formatTitle(book.title)}</p>
                               {book.author && (
                                 <p className="text-sm text-muted-foreground truncate">{book.author}</p>
                               )}
@@ -682,57 +649,9 @@ export default function Dashboard() {
                     ) : (
                       <div className="text-center py-6">
                         <BookOpen className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground">No books yet</p>
+                        <p className="text-muted-foreground">No documents yet</p>
                         <Button size="sm" className="mt-3" onClick={() => navigate('/books/add')}>
-                          Add Your First Book
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Recent Scripts */}
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Recent Scripts
-                    </CardTitle>
-                    <Button variant="outline" size="sm" onClick={() => navigate('/scripts')}>
-                      View All
-                    </Button>
-                  </CardHeader>
-                  <CardContent>
-                    {recentScripts.length > 0 ? (
-                      <div className="space-y-3">
-                        {recentScripts.map((script) => (
-                          <div key={script.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors">
-                            <div className="w-10 h-10 rounded bg-accent/10 flex items-center justify-center">
-                              <FileText className="w-5 h-5 text-accent" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium truncate">{script.title}</p>
-                              <div className="flex gap-2 mt-1">
-                                <Badge variant="outline" className="text-xs">
-                                  {script.detail_level}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  {script.difficulty}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">
-                                Created {getRelativeTime(script.created_at)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-6">
-                        <FileText className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-muted-foreground">No scripts yet</p>
-                        <Button size="sm" className="mt-3" onClick={() => navigate('/scripts')}>
-                          Create Your First Script
+                          Upload documents
                         </Button>
                       </div>
                     )}

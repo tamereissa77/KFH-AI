@@ -66,6 +66,8 @@ class ChatRequest(BaseModel):
     session_id: Optional[str] = Field(default="", description="Chat session ID - empty string for new sessions")
     user_message: str = Field(..., description="User's message")
     intent: Optional[str] = Field(default="answer_question", description="Chat intent")
+    book_id: Optional[int] = Field(default=None, description="Limit the answer to one document in the knowledge base")
+    topic: Optional[str] = Field(default=None, description="Specific point or topic to focus the search on")
 
 class ChatResponse(BaseModel):
     response: str

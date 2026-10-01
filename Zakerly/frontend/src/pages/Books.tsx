@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTitle } from '@/lib/utils';
 import { Header } from '@/components/ui/header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,16 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { 
-  BookOpen, 
-  Plus, 
-  Search, 
-  MessageSquare, 
-  GraduationCap,
-  Loader2,
-  AlertCircle,
-  Sparkles
-} from 'lucide-react';
+import { BookOpen, Plus, Search, MessageSquare, GraduationCap, Loader2, AlertCircle, Sparkles, FolderOpen, ClipboardCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BooksService, CurriculumService, Utils } from '@/lib/services';
 import type { Book as BookType, Curriculum } from '@/lib/types';
@@ -65,7 +57,7 @@ export default function Books() {
 
   const getCurriculumName = (curriculumId: number): string => {
     const curriculum = curriculums.find(curr => curr.id === curriculumId);
-    return curriculum ? curriculum.name : 'Unknown Curriculum';
+    return curriculum ? curriculum.name : 'Unknown knowledge base';
   };
 
   const formatDate = (dateString: string): string => {
@@ -80,7 +72,7 @@ export default function Books() {
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
               <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
-              <p className="text-muted-foreground">Loading your books...</p>
+              <p className="text-muted-foreground">Loading documents...</p>
             </div>
           </div>
         </div>
@@ -98,10 +90,10 @@ export default function Books() {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gradient-primary mb-2">
-                My Books
+                Knowledge Bases
               </h1>
               <p className="text-muted-foreground">
-                Manage your academic library and unlock AI-powered features
+                Internal documents grouped by knowledge base. Ask questions or create quizzes from any document.
               </p>
             </div>
             <Button 
@@ -109,7 +101,7 @@ export default function Books() {
               className="bg-gradient-primary"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Add Book
+              Upload Documents
             </Button>
           </div>
 
@@ -139,7 +131,7 @@ export default function Books() {
                   <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search books by title or author..."
+                      placeholder="Search documents by title..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
@@ -152,10 +144,10 @@ export default function Books() {
                 <div className="flex justify-end">
                   <Select value={filterCurriculum} onValueChange={setFilterCurriculum}>
                     <SelectTrigger className="w-full md:w-64">
-                      <SelectValue placeholder="Filter by curriculum" />
+                      <SelectValue placeholder="Filter by knowledge base" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Curriculums</SelectItem>
+                      <SelectItem value="all">All knowledge bases</SelectItem>
                       {curriculums.map(curriculum => (
                         <SelectItem key={curriculum.id} value={curriculum.id.toString()}>
                           <div className="flex flex-col">
@@ -179,42 +171,20 @@ export default function Books() {
           </Card>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 gap-4 mb-8">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{books.length}</div>
-                  <div className="text-sm text-muted-foreground">Total Books</div>
+                  <div className="text-sm text-muted-foreground">Documents</div>
                 </div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-secondary">
-                    {curriculums.length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Curriculums</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">
-                    {books.filter(book => book.author).length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">With Authors</div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {books.filter(book => book.publication_year).length}
-                  </div>
-                  <div className="text-sm text-muted-foreground">With Publication Year</div>
+                  <div className="text-2xl font-bold text-accent">{curriculums.length}</div>
+                  <div className="text-sm text-muted-foreground">Knowledge bases</div>
                 </div>
               </CardContent>
             </Card>
@@ -227,17 +197,17 @@ export default function Books() {
                 <div className="text-center">
                   <BookOpen className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
                   <h3 className="text-lg font-semibold mb-2">
-                    {books.length === 0 ? 'No books in your library' : 'No books found'}
+                    {books.length === 0 ? 'No documents yet' : 'No documents found'}
                   </h3>
                   <p className="text-muted-foreground mb-4">
                     {books.length === 0 
-                      ? 'Add your first book to get started with AI-powered features' 
+                      ? 'Upload documents to a knowledge base so staff can ask questions about them' 
                       : 'Try adjusting your search or filters'}
                   </p>
                   {books.length === 0 && (
                     <Button onClick={() => navigate('/books/add')} className="bg-gradient-primary">
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Book
+                      Upload Documents
                     </Button>
                   )}
                 </div>
@@ -250,10 +220,10 @@ export default function Books() {
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg leading-tight mb-1 break-words">{book.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {book.author ? `by ${book.author}` : 'Author unknown'}
-                        </p>
+                        <CardTitle className="text-lg leading-tight mb-1 break-words">{formatTitle(book.title)}</CardTitle>
+                        {book.author && (
+                          <p className="text-sm text-muted-foreground truncate">Issued by {book.author}</p>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -261,8 +231,8 @@ export default function Books() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex flex-wrap gap-1">
                         {book.curriculum_id && (
-                          <Badge variant="default" className="bg-gradient-primary text-white">
-                            <GraduationCap className="w-3 h-3 mr-1" />
+                          <Badge variant="default" className="bg-primary text-white">
+                            <FolderOpen className="w-3 h-3 mr-1" />
                             {getCurriculumName(book.curriculum_id)}
                           </Badge>
                         )}
@@ -297,10 +267,10 @@ export default function Books() {
                         variant="outline" 
                         size="sm" 
                         className="flex-1"
-                        onClick={() => navigate(`/chat?book=${encodeURIComponent(book.title)}`)}
+                        onClick={() => navigate(`/chat?document=${book.id}`)}
                       >
                         <MessageSquare className="w-3 h-3 mr-2" />
-                        Chat
+                        Ask
                       </Button>
                       <Button 
                         variant="outline" 
@@ -308,8 +278,8 @@ export default function Books() {
                         className="flex-1"
                         onClick={() => navigate(`/exam-setup/${encodeURIComponent(book.title)}`)}
                       >
-                        <GraduationCap className="w-3 h-3 mr-2" />
-                        Exam
+                        <ClipboardCheck className="w-3 h-3 mr-2" />
+                        Quiz
                       </Button>
                     </div>
                   </CardContent>

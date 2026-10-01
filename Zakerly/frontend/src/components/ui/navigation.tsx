@@ -1,25 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  BookOpen, 
-  Home, 
-  MessageSquare, 
-  FileText, 
-  GraduationCap,
-  Presentation,
-  Projector,
-  BarChart3
-} from 'lucide-react';
+import { Home, BarChart3, FolderOpen, MessageSquare, ClipboardCheck } from 'lucide-react';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Home' },
   { to: '/dashboard', icon: BarChart3, label: 'Dashboard' },
-  { to: '/books', icon: BookOpen, label: 'My Books' },
-  { to: '/chat', icon: MessageSquare, label: 'Chat' },
-  { to: '/exams', icon: GraduationCap, label: 'Exams' },
-  { to: '/scripts', icon: FileText, label: 'Scripts' },
-  { to: '/presentations', icon: Projector, label: 'Presentations' },
+  { to: '/books', icon: FolderOpen, label: 'Knowledge Bases' },
+  { to: '/chat', icon: MessageSquare, label: 'Ask' },
+  { to: '/exams', icon: ClipboardCheck, label: 'Policy Quizzes' },
 ];
 
 export function Navigation() {

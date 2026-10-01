@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 import asyncio
 from datetime import datetime
 import json
@@ -26,6 +26,10 @@ import os
 import io
 
 logger = logging.getLogger(__name__)
+
+# Page boundaries kept in extracted PDF text so chunks can cite their page
+PAGE_MARKER = "[[PAGE {n}]]"
+PAGE_MARKER_RE = re.compile(r"\[\[PAGE (\d+)\]\]\n?")
 
 class IngestionService:
     def __init__(self, db_manager: DatabaseManager, redis_manager: RedisManager):
@@ -112,7 +116,9 @@ Respond with ONLY the JSON object, no additional text."""),
             text_content = await self._extract_text(content, filename, mime_type)
             
             # Extract metadata using LLM (no more auto-categorization)
-            metadata = await self._extract_metadata(text_content, file_hash, filename, curriculum_id, curriculum_name)
+            metadata = await self._extract_metadata(
+                PAGE_MARKER_RE.sub("", text_content), file_hash, filename, curriculum_id, curriculum_name
+            )
             
             # Insert book into database first - this is the critical operation
             book_id = await self.db.insert_book({
@@ -138,7 +144,9 @@ Respond with ONLY the JSON object, no additional text."""),
             
             # Try to create curriculum-based vector store - if this fails, we still return success
             try:
-                await self._create_curriculum_vector_store(text_content, curriculum_name, curriculum_id, book_id)
+                await self._create_curriculum_vector_store(
+                    text_content, curriculum_name, curriculum_id, book_id, metadata.title, filename
+                )
                 logger.info(f"Successfully created curriculum vector store for: {metadata.title} in curriculum: {curriculum_name}")
             except Exception as vector_error:
                 logger.error(f"Failed to create curriculum vector store for {metadata.title}: {vector_error}")
@@ -174,8 +182,17 @@ Respond with ONLY the JSON object, no additional text."""),
                     # Clean up temp file
                     os.unlink(temp_file.name)
                     
-                    # Combine all pages
-                    text = "\n".join([doc.page_content for doc in documents])
+                    # Combine pages, keeping page markers so chunks can cite page numbers
+                    text = "\n".join(
+                        f"{PAGE_MARKER.format(n=i + 1)}\n{doc.page_content}"
+                        for i, doc in enumerate(documents)
+                    )
+
+            elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                text = self._extract_docx_text(content)
+
+            elif mime_type == "application/msword":
+                raise ValueError("Legacy .doc files are not supported; please save the file as .docx or PDF")
                     
             elif mime_type == "text/plain":
                 text = content.decode('utf-8', errors='replace')
@@ -194,6 +211,36 @@ Respond with ONLY the JSON object, no additional text."""),
         except Exception as e:
             logger.error(f"Error extracting text from {filename}: {e}")
             raise ValueError(f"Failed to extract text from file: {e}")
+
+    def _extract_docx_text(self, content: bytes) -> str:
+        """Extract paragraphs and tables from a .docx file, in document order"""
+        from docx import Document
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
+
+        document = Document(io.BytesIO(content))
+        parts = []
+        for block in document.element.body.iterchildren():
+            if block.tag.endswith('}p'):
+                para_text = Paragraph(block, document).text.strip()
+                if para_text:
+                    parts.append(para_text)
+            elif block.tag.endswith('}tbl'):
+                for row in Table(block, document).rows:
+                    cells = [cell.text.strip() for cell in row.cells]
+                    if any(cells):
+                        parts.append(" | ".join(cells))
+        return "\n".join(parts)
+
+    def _split_pages(self, text: str) -> List[Tuple[Optional[int], str]]:
+        """Split extracted text on page markers into (page_number, text) pairs"""
+        pieces = PAGE_MARKER_RE.split(text)
+        if len(pieces) == 1:
+            return [(None, text)]
+        # re.split with one capture group gives [before, page1, text1, page2, text2, ...]
+        pages = [(None, pieces[0])] if pieces[0].strip() else []
+        pages += [(int(pieces[i]), pieces[i + 1]) for i in range(1, len(pieces), 2)]
+        return pages
 
     def _clean_text_for_database(self, text: str) -> str:
         """Clean text to remove characters that cause database encoding issues"""
@@ -333,11 +380,19 @@ Respond with ONLY the JSON object, no additional text."""),
             logger.info(f"Using fallback metadata: {fallback_metadata.title}")
             return fallback_metadata
 
-    async def _create_curriculum_vector_store(self, text: str, curriculum_name: str, curriculum_id: int, book_id: int):
+    async def _create_curriculum_vector_store(self, text: str, curriculum_name: str, curriculum_id: int, book_id: int,
+                                              book_title: str = None, file_name: str = None):
         """Create curriculum-based vector store for the book"""
         try:
-            # Split text into chunks
-            documents = self.text_splitter.create_documents([text])
+            # Split text into chunks per page, tagging each with its source document and page
+            pages = self._split_pages(text)
+            documents = self.text_splitter.create_documents(
+                [page_text for _, page_text in pages],
+                metadatas=[
+                    {k: v for k, v in {"book_title": book_title, "file_name": file_name, "page": page}.items() if v is not None}
+                    for page, _ in pages
+                ],
+            )
             
             # Create embeddings for all documents
             texts = [doc.page_content for doc in documents]

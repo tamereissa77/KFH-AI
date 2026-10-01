@@ -50,10 +50,19 @@ export interface ChatMessage {
 
 export interface ChatRequest {
   curriculum: string;
-  book_title: string;
+  book_title?: string;
   session_id: string;
   user_message: string;
   intent?: string;
+  book_id?: number | null;
+  topic?: string | null;
+}
+
+export interface ChatSource {
+  n: number;
+  document: string;
+  page?: number | null;
+  excerpt: string;
 }
 
 export interface ChatResponse {
