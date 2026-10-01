@@ -6,7 +6,7 @@ import asyncio
 from contextlib import asynccontextmanager
 import asyncpg
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -31,29 +31,28 @@ class ScriptService:
             base_url=os.getenv("OLLAMA_BASE_URL")
         )
         
-        # Primary LLM (Google Gemini)
-        gemini_model = os.getenv("CHAT_MODEL_NAME", "gemini-2.0-flash-exp")
+        # Primary LLM (local vLLM, OpenAI-compatible)
+        llm_model = os.getenv("LLM_MODEL_NAME", "/models/gemma-4-26B-A4B-it")
         try:
-            self.llm = ChatGoogleGenerativeAI(
-                model=gemini_model,
+            self.llm = ChatOpenAI(
+                model=llm_model,
+                base_url=os.getenv("LLM_BASE_URL", "http://host.docker.internal:8000/v1"),
+                api_key=os.getenv("LLM_API_KEY", "EMPTY"),
                 temperature=float(os.getenv("CHAT_MODEL_TEMPERATURE", "0.7")),
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                top_k=40,
                 top_p=0.8,
-                max_tokens=8192,
-                convert_system_message_to_human=True  # Fix: Gemini doesn't support SystemMessage
+                max_tokens=2048
             )
         except Exception as llm_init_error:
             logger.warning(f"⚠️ Primary LLM initialization failed: {llm_init_error}")
-            self.llm = ChatGoogleGenerativeAI(
-                model=gemini_model,
-                temperature=0.7,
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                convert_system_message_to_human=True  # Fix: Gemini doesn't support SystemMessage
+            self.llm = ChatOpenAI(
+                model=llm_model,
+                base_url=os.getenv("LLM_BASE_URL", "http://host.docker.internal:8000/v1"),
+                api_key=os.getenv("LLM_API_KEY", "EMPTY"),
+                temperature=0.7
             )
         
         self.connection_string = os.getenv("DATABASE_URL")
-        logger.info(f"✅ ScriptService initialized with {gemini_model}")
+        logger.info(f"✅ ScriptService initialized with {llm_model}")
 
     def get_current_llm(self):
         """Get the current LLM instance"""

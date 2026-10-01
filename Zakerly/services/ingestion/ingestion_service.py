@@ -9,7 +9,7 @@ import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_community.embeddings import OllamaEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from langchain_community.vectorstores.pgvector import PGVector
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
@@ -38,10 +38,11 @@ class IngestionService:
             base_url=os.getenv("OLLAMA_BASE_URL")
         )
         
-        self.llm = ChatGoogleGenerativeAI(
-            model=os.getenv("INGESTION_MODEL_NAME", "gemini-1.5-flash"),
-            temperature=float(os.getenv("INGESTION_MODEL_TEMPERATURE", "0")),
-            google_api_key=os.getenv("GOOGLE_API_KEY")
+        self.llm = ChatOpenAI(
+            model=os.getenv("LLM_MODEL_NAME", "/models/gemma-4-26B-A4B-it"),
+            base_url=os.getenv("LLM_BASE_URL", "http://host.docker.internal:8000/v1"),
+            api_key=os.getenv("LLM_API_KEY", "EMPTY"),
+            temperature=float(os.getenv("INGESTION_MODEL_TEMPERATURE", "0"))
         )
         
         self.text_splitter = RecursiveCharacterTextSplitter(

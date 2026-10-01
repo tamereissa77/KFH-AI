@@ -1,6 +1,7 @@
 # Local deployment overrides for this host (192.168.8.4, aarch64 + NVIDIA GB10).
 # - Runs Ollama locally for embeddings (the 172.24.88.88 instance in .env is unreachable here).
 # - Bakes this host's gateway URL into the frontend build.
+# - Uses the host's gemma4-gb10-vllm (~/gemma-gb10, port 8000) as the LLM instead of Google Gemini.
 services:
   ollama:
     image: ollama/ollama:latest
@@ -25,21 +26,41 @@ services:
   ingestion-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       ollama:
         condition: service_healthy
   chat-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   exam-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   script-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   presentation-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - LLM_BASE_URL=http://host.docker.internal:8000/v1
+      - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     build:
