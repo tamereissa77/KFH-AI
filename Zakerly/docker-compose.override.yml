@@ -1,5 +1,5 @@
 # Local deployment overrides for the GB10 (aarch64 + NVIDIA GB10).
-# - Runs Ollama locally for embeddings (the 172.24.88.88 instance in .env is unreachable here).
+# - Runs Ollama locally for embeddings with bge-m3 (multilingual, good Arabic retrieval; 1024-dim vectors).
 # - Uses the host's gemma4-gb10-vllm (~/gemma-gb10, port 8000) as the LLM instead of Google Gemini.
 services:
   ollama:
@@ -25,6 +25,8 @@ services:
   ingestion-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
       - LLM_BASE_URL=http://host.docker.internal:8000/v1
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:
@@ -35,6 +37,8 @@ services:
   chat-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
       - LLM_BASE_URL=http://host.docker.internal:8000/v1
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:
@@ -42,6 +46,8 @@ services:
   exam-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
       - LLM_BASE_URL=http://host.docker.internal:8000/v1
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:
@@ -49,6 +55,8 @@ services:
   script-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
       - LLM_BASE_URL=http://host.docker.internal:8000/v1
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:
@@ -56,6 +64,8 @@ services:
   presentation-service:
     environment:
       - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_EMBEDDING_MODEL=bge-m3
+      - EMBEDDING_DIMENSION=1024
       - LLM_BASE_URL=http://host.docker.internal:8000/v1
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:

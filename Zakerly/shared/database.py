@@ -290,8 +290,8 @@ class DatabaseManager:
         """
         curriculum_id = await self.fetch_val(query, name, description, created_by)
         
-        # Create corresponding embedding table with correct dimension for nomic-embed-text
-        await self.create_curriculum_embedding_table(name, embedding_dimension=768)
+        # Embedding table dimension must match the embedding model (EMBEDDING_DIMENSION: 768 nomic-embed-text, 1024 bge-m3)
+        await self.create_curriculum_embedding_table(name, embedding_dimension=int(os.getenv("EMBEDDING_DIMENSION", "768")))
         
         return curriculum_id
     
