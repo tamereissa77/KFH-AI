@@ -213,8 +213,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: zakerly_frontend
-    environment:
-      - VITE_API_URL=http://172.24.111.111:8007
     ports:
       - "3001:3000"
     depends_on:

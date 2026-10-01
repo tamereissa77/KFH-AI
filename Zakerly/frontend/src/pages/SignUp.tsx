@@ -87,7 +87,7 @@ export default function SignUp() {
 
     try {
       // Get the API Gateway URL from environment variables
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8007';
+      const apiUrl = import.meta.env.VITE_API_URL ?? '';
       
       // Send the user's registration details to the API Gateway
       const response = await fetch(`${apiUrl}/api/v1/auth/signup`, {

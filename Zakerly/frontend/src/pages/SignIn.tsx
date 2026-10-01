@@ -49,7 +49,7 @@ export default function SignIn() {
 
     try {
       // Get the API Gateway URL from environment variables
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8007';
+      const apiUrl = import.meta.env.VITE_API_URL ?? '';
       
       // Send the login credentials to the API Gateway
       const response = await fetch(`${apiUrl}/api/v1/auth/login`, {

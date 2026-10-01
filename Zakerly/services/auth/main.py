@@ -348,7 +348,7 @@ async def get_user_stats(current_user: User = Depends(get_current_user)):
         conn = get_db_connection()
         with conn.cursor() as cursor:
             # Get books count (assuming books table exists)
-            cursor.execute("SELECT COUNT(*) as count FROM books WHERE created_by = %s OR %s = %s", (current_user.id, current_user.id, current_user.id))
+            cursor.execute("SELECT COUNT(*) as count FROM books")  # books has no owner column
             books_result = cursor.fetchone()
             total_books = books_result["count"] if books_result else 0
             

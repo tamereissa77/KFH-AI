@@ -1,6 +1,5 @@
-# Local deployment overrides for this host (192.168.8.4, aarch64 + NVIDIA GB10).
+# Local deployment overrides for the GB10 (aarch64 + NVIDIA GB10).
 # - Runs Ollama locally for embeddings (the 172.24.88.88 instance in .env is unreachable here).
-# - Bakes this host's gateway URL into the frontend build.
 # - Uses the host's gemma4-gb10-vllm (~/gemma-gb10, port 8000) as the LLM instead of Google Gemini.
 services:
   ollama:
@@ -61,11 +60,6 @@ services:
       - LLM_MODEL_NAME=/models/gemma-4-26B-A4B-it
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
-  frontend:
-    build:
-      args:
-        VITE_API_URL: http://192.168.8.4:8007
 
 volumes:
   ollama_data:

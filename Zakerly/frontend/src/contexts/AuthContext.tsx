@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!token) return;
       
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8007';
+      const apiUrl = import.meta.env.VITE_API_URL ?? '';
       const response = await fetch(`${apiUrl}/api/v1/auth/track-activity`, {
         method: 'POST',
         headers: {
